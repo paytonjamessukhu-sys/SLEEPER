@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warchest — Dynasty HQ for Sleeper</title>
+<meta name="description" content="KTC-style market values, power rankings, and a trade calculator for your Sleeper fantasy leagues. Read-only, no login.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💎</text></svg>">
+<style>
+/* ---------- theme tokens (light on :root; dark under media + data-theme) ---------- */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb;
+  --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+  --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --seq-fill: #2a78d6; --seq-track: #cde2fb;
+  --up: #006300; --down: #d03b3b;
+  --accent: #2a78d6; --accent-soft: rgba(42,120,214,0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --seq-fill: #3987e5; --seq-track: #0d366b;
+    --up: #0ca30c; --down: #d03b3b;
+    --accent: #3987e5; --accent-soft: rgba(57,135,229,0.16);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19;
+  --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+  --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --seq-fill: #3987e5; --seq-track: #0d366b;
+  --up: #0ca30c; --down: #d03b3b;
+  --accent: #3987e5; --accent-soft: rgba(57,135,229,0.16);
+}
+
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--page); color: var(--ink-1);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input, select { font: inherit; color: var(--ink-1); background: var(--surface);
+  border: 1px solid var(--baseline); border-radius: 8px; padding: 7px 10px; }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px 64px; }
+
+/* ---------- header ---------- */
+header { position: sticky; top: 0; z-index: 20; background: var(--page);
+  border-bottom: 1px solid var(--grid); }
+.head-in { max-width: 1080px; margin: 0 auto; padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+.logo svg { display: block; }
+.logo .tag { font-weight: 400; font-size: 12px; color: var(--ink-muted); }
+.head-spacer { flex: 1; }
+.userbox { display: flex; gap: 8px; align-items: center; }
+.userbox input { width: 150px; }
+.btn { background: var(--accent); color: #fff; border-radius: 8px; padding: 7px 14px; font-weight: 600; }
+.btn.ghost { background: none; color: var(--ink-2); border: 1px solid var(--baseline); }
+.btn:disabled { opacity: .5; cursor: default; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--grid); }
+
+/* ---------- league picker + controls ---------- */
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0 4px; }
+.chip { border: 1px solid var(--baseline); border-radius: 999px; padding: 5px 12px;
+  color: var(--ink-2); font-size: 13px; }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink-1); font-weight: 600; }
+.pill { font-size: 11px; border: 1px solid var(--baseline); border-radius: 999px;
+  padding: 2px 8px; color: var(--ink-muted); }
+.pill.warn { border-color: var(--s2); color: var(--s2); }
+.seg { display: inline-flex; border: 1px solid var(--baseline); border-radius: 8px; overflow: hidden; }
+.seg button { padding: 5px 12px; font-size: 13px; color: var(--ink-2); }
+.seg button.on { background: var(--accent-soft); color: var(--ink-1); font-weight: 600; }
+
+/* ---------- tabs ---------- */
+nav.tabs { display: flex; gap: 2px; margin: 14px 0 18px; border-bottom: 1px solid var(--grid); }
+nav.tabs button { padding: 9px 14px; color: var(--ink-2); font-weight: 600;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav.tabs button.on { color: var(--ink-1); border-bottom-color: var(--accent); }
+
+/* ---------- cards / layout ---------- */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; margin-bottom: 2px; }
+.card .sub { color: var(--ink-muted); font-size: 12px; margin-bottom: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* grid items default to min-width:auto and refuse to shrink below their content,
+   which pushes a wide table out of the page instead of letting it scroll itself */
+.grid2 > * { min-width: 0; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.statrow { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; min-width: 140px; flex: 1; }
+.stat .lab { font-size: 12px; color: var(--ink-muted); }
+.stat .val { font-size: 26px; font-weight: 600; margin-top: 2px; }
+.stat .sub { font-size: 12px; color: var(--ink-2); }
+
+/* ---------- power ranking bars ---------- */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; font-size: 12px; color: var(--ink-2); }
+.legend .key { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.prow { display: grid; grid-template-columns: 26px 170px 1fr 74px; gap: 10px;
+  align-items: center; padding: 5px 0; }
+.prow .rank { color: var(--ink-muted); font-size: 12px; text-align: right; }
+.prow .team { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .team .you { font-size: 10px; font-weight: 700; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; margin-left: 6px; }
+.prow .val { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); text-align: right; }
+.bar { display: flex; height: 20px; align-items: stretch; }
+.bar .segm { margin-right: 2px; }
+.bar .segm:last-child { margin-right: 0; border-radius: 0 4px 4px 0; }
+@media (max-width: 700px) { .prow { grid-template-columns: 22px 110px 1fr 64px; } }
+
+/* ---------- tables ---------- */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11px; color: var(--ink-muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.me td { background: var(--accent-soft); }
+.posgroup td.gh { font-size: 11px; font-weight: 700; color: var(--ink-muted);
+  text-transform: uppercase; letter-spacing: .05em; padding-top: 14px; border-bottom: 1px solid var(--baseline); }
+.meter { display: inline-flex; align-items: center; gap: 8px; width: 100%; }
+.meter .track { flex: 1; height: 8px; border-radius: 4px; background: var(--seq-track); overflow: hidden; }
+.meter .fill { height: 100%; background: var(--seq-fill); border-radius: 0 4px 4px 0; }
+.meter .mval { width: 48px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.delta-up { color: var(--up); } .delta-down { color: var(--down); }
+.posbadge { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px;
+  color: var(--ink-2); border: 1px solid var(--baseline); }
+
+/* ---------- trade calculator ---------- */
+.tside { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); }
+.tside h3 { font-size: 13px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tsearch { position: relative; margin-bottom: 10px; }
+.tsearch input { width: 100%; }
+.sugg { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; background: var(--surface);
+  border: 1px solid var(--baseline); border-radius: 8px; margin-top: 4px; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.sugg button { display: flex; width: 100%; gap: 8px; align-items: center; padding: 8px 10px;
+  text-align: left; font-size: 13px; }
+.sugg button:hover, .sugg button.hl { background: var(--accent-soft); }
+.sugg .sv { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.asset { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--grid); margin-bottom: 6px; font-size: 13px; }
+.asset .av { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.asset .rm { color: var(--ink-muted); font-size: 15px; padding: 0 2px; }
+.asset .rm:hover { color: var(--down); }
+.tside .total { text-align: right; font-weight: 700; font-size: 15px; margin-top: 8px; }
+.verdict { margin-top: 16px; }
+.vbar { display: flex; height: 22px; margin: 10px 0 6px; }
+.vbar > div { border-radius: 4px; }
+.vbar .a { background: var(--s1); margin-right: 2px; border-radius: 4px 0 0 4px; }
+.vbar .b { background: var(--s2); border-radius: 0 4px 4px 0; }
+.vlabels { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); }
+.vmsg { text-align: center; font-weight: 700; font-size: 15px; margin-top: 10px; }
+.vmsg .sub { display: block; font-weight: 400; font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+/* ---------- misc ---------- */
+.banner { border: 1px solid var(--s2); background: color-mix(in srgb, var(--s2) 8%, var(--surface));
+  color: var(--ink-1); border-radius: 10px; padding: 10px 14px; margin: 14px 0; font-size: 13px; }
+.banner.err { border-color: var(--down); background: color-mix(in srgb, var(--down) 8%, var(--surface)); }
+.status { color: var(--ink-muted); font-size: 13px; margin: 12px 0; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--grid);
+  border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite;
+  vertical-align: -2px; margin-right: 6px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+#tooltip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface);
+  border: 1px solid var(--baseline); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.22); display: none; max-width: 260px; }
+#tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
+#tooltip .tt-row { display: flex; gap: 10px; justify-content: space-between; color: var(--ink-2); }
+footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
+  color: var(--ink-muted); font-size: 12px; }
+.hidden { display: none !important; }
+.empty { color: var(--ink-muted); text-align: center; padding: 32px 0; }
+
+/* ---------- phone ---------- */
+@media (max-width: 640px) {
+  .wrap { padding: 0 12px 48px; }
+  .head-in { padding: 10px 12px; gap: 8px; }
+  .logo { font-size: 16px; }
+  .logo .tag { display: none; }
+  .userbox { width: 100%; order: 3; }
+  .userbox input { flex: 1; width: auto; min-width: 0; }
+  .head-spacer { display: none; }
+  /* tab strip scrolls sideways instead of wrapping into two rows */
+  nav.tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    margin: 12px -12px 14px; padding: 0 12px; }
+  nav.tabs::-webkit-scrollbar { display: none; }
+  nav.tabs button { flex: 0 0 auto; padding: 10px 12px; font-size: 13px; }
+  .controls { gap: 6px; margin: 12px 0 2px; overflow-x: auto; scrollbar-width: none;
+    flex-wrap: nowrap; padding-bottom: 2px; }
+  .controls::-webkit-scrollbar { display: none; }
+  .controls > * { flex: 0 0 auto; }
+  /* two stat tiles per row reads better than four squeezed ones */
+  .statrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { min-width: 0; padding: 10px 12px; }
+  .stat .val { font-size: 21px; overflow-wrap: anywhere; }
+  .card { padding: 13px; border-radius: 11px; }
+  .prow { grid-template-columns: 18px 1fr 62px; grid-template-areas: "r t v" ". b b";
+    gap: 4px 8px; padding: 7px 0; }
+  .prow .rank { grid-area: r; } .prow .team { grid-area: t; }
+  .prow .val { grid-area: v; } .prow .bar { grid-area: b; height: 16px; }
+  /* wide tables scroll inside themselves; the page body never scrolls sideways */
+  table { display: block; overflow-x: auto; width: auto; min-width: 100%;
+    -webkit-overflow-scrolling: touch; }
+  th, td { padding: 7px 6px; white-space: nowrap; }
+  .meter { min-width: 130px; }
+  .tside { padding: 12px; }
+  /* comfortable thumb targets */
+  .sugg button { padding: 11px 10px; }
+  .asset { padding: 9px 10px; }
+  .asset .rm { padding: 0 6px; font-size: 17px; }
+  .btn { padding: 9px 14px; }
+  #tooltip { max-width: min(280px, calc(100vw - 24px)); }
+}
+</style>
+</head>
+<body>
+<header><div class="head-in">
+  <span class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5.5 4h13L22 9.5 12 21 2 9.5 5.5 4Z" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M2 9.5h20M8.5 9.5 12 21l3.5-11.5M8.5 9.5 12 4l3.5 5.5" stroke="var(--accent)" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>
+    Warchest <span class="tag">dynasty HQ for Sleeper</span>
+  </span>
+  <span class="head-spacer"></span>
+  <span class="userbox">
+    <img id="uavatar" class="avatar hidden" alt="">
+    <input id="uname" placeholder="Sleeper username" autocomplete="off" spellcheck="false">
+    <button id="loadBtn" class="btn">Load</button>
+    <button id="themeBtn" class="btn ghost" title="Toggle theme">◐</button>
+  </span>
+</div></header>
+
+<div class="wrap">
+  <div id="banner"></div>
+  <div id="controls" class="controls hidden">
+    <span id="leagueChips"></span>
+    <span class="head-spacer"></span>
+    <span class="seg" id="modeSeg">
+      <button data-mode="dynasty" class="on">Dynasty</button>
+      <button data-mode="redraft">Redraft</button>
+    </span>
+    <span id="fmtPill" class="pill"></span>
+    <span id="srcPill" class="pill"></span>
+  </div>
+  <div id="status" class="status"><span class="spin"></span>Loading…</div>
+
+  <nav class="tabs hidden" id="tabs">
+    <button data-tab="power" class="on">Power Rankings</button>
+    <button data-tab="rosters">Rosters</button>
+    <button data-tab="trade">Trade Calculator</button>
+    <button data-tab="standings">Standings</button>
+    <button data-tab="market">Market</button>
+  </nav>
+
+  <main id="view"></main>
+
+  <footer>
+    <b>Warchest</b> is read-only: Sleeper's public API has no login and no write access —
+    your password is never needed, never asked for. Values courtesy of the free
+    <a href="https://www.fantasycalc.com" target="_blank" rel="noopener">FantasyCalc</a> API
+    (market-based, KTC-style 0–10k scale); league data from the
+    <a href="https://docs.sleeper.com" target="_blank" rel="noopener">Sleeper API</a>.
+  </footer>
+</div>
+<div id="tooltip"></div>
+
+<script>
+"use strict";
+/* =============================== state =============================== */
+const SLEEPER = "https://api.sleeper.app/v1";
+const FC = "https://api.fantasycalc.com/values/current";
+const CDN = "https://sleepercdn.com";
+const POS_SLOTS = { QB:["QB"], RB:["RB"], WR:["WR"], TE:["TE"], K:["K"], DEF:["DEF"],
+  FLEX:["RB","WR","TE"], WRRB_FLEX:["WR","RB"], WRRB_WRT_FLEX:["WR","RB","TE"],
+  REC_FLEX:["WR","TE"], SUPER_FLEX:["QB","RB","WR","TE"] };
+const GROUPS = ["QB","RB","WR","TE"];
+const GROUP_VARS = { QB:"--s1", RB:"--s2", WR:"--s3", TE:"--s4" };
+
+const S = {
+  username:null, user:null, season:null, leagues:[], league:null,
+  rosters:[], lusers:[], players:{}, values:{}, picks:[],
+  mode:"dynasty", source:null, myRosterId:null, tab:"power",
+  trade:{ a:[], b:[] },
+};
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, cls, html) => { const n=document.createElement(tag);
+  if(cls) n.className=cls; if(html!=null) n.innerHTML=html; return n; };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n) => Math.round(n).toLocaleString("en-US");
+
+/* =============================== fetch =============================== */
+/* Demo mode: when a baked dataset is present the app never touches the network,
+   so it runs anywhere outbound requests are sandboxed (e.g. a published
+   artifact). Same rendering code either way — only the transport changes. */
+const DEMO = window.WARCHEST_DEMO || null;
+function demoRoute(url) {
+  if (url.startsWith(FC)) return DEMO.values;
+  const p = url.slice(SLEEPER.length);
+  if (p === "/state/nfl") return DEMO.state;
+  if (p === "/players/nfl") return DEMO.players;
+  if (p.includes("/trending/add")) return DEMO.trendingAdd;
+  if (p.includes("/trending/drop")) return DEMO.trendingDrop;
+  if (p.includes("/leagues/nfl/")) return p.endsWith(`/${DEMO.season}`) ? DEMO.leagues : [];
+  if (p.startsWith("/user/")) return DEMO.user;
+  const m = p.match(/^\/league\/([^/]+)\/(\w+)/);
+  if (m) return (DEMO.leagueData[m[1]] || {})[m[2]] ?? [];
+  return null;
+}
+async function getJSON(url, timeoutMs=20000) {
+  if (DEMO) return demoRoute(url);
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctl.signal });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+const sleeper = (path) => getJSON(SLEEPER + path);
+
+function lsGet(key, ttlMs) {
+  if (DEMO) return null;   // never mix baked demo data into the real cache
+  try { const raw = localStorage.getItem(key); if (!raw) return null;
+    const { t, d } = JSON.parse(raw);
+    return (Date.now() - t < ttlMs) ? d : null; } catch { return null; }
+}
+function lsSet(key, d) {
+  if (DEMO) return;
+  try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), d })); } catch {}
+}
+
+/* =============================== player db =============================== */
+async function loadPlayers() {
+  const cached = lsGet("wc_players_v1", 24*3600*1000);
+  if (cached) { S.players = cached; return; }
+  if (!DEMO) setStatus("Downloading player database (~5 MB, cached for a day)…");
+  const full = await sleeper("/players/nfl") || {};
+  const trim = {};
+  for (const [id, p] of Object.entries(full)) {
+    if (!p || (!p.active && p.search_rank == null)) continue;
+    trim[id] = { n: p.full_name || `${p.first_name||""} ${p.last_name||""}`.trim() || id,
+      p: p.position || "?", t: p.team || null, a: p.age || null,
+      r: (p.search_rank && p.search_rank < 9999999) ? p.search_rank : null };
+  }
+  S.players = trim;
+  lsSet("wc_players_v1", trim);
+}
+function pinfo(id) {
+  const p = S.players[id];
+  if (p) return p;
+  if (/^[A-Z]{2,3}$/.test(id)) return { n:`${id} D/ST`, p:"DEF", t:id, a:null, r:null };
+  return { n:`Player ${id}`, p:"?", t:null, a:null, r:null };
+}
+
+/* =============================== values =============================== */
+function leagueFormat() {
+  const rp = S.league?.roster_positions || [];
+  const sf = rp.includes("SUPER_FLEX") || rp.filter(x => x === "QB").length >= 2;
+  const ppr = S.league?.scoring_settings?.rec ?? 1;
+  const tep = (S.league?.scoring_settings?.bonus_rec_te || 0) > 0;
+  return { numQbs: sf ? 2 : 1, ppr, tep, teams: S.league?.total_rosters || 12 };
+}
+async function loadValues() {
+  const f = leagueFormat();
+  const dyn = S.mode === "dynasty";
+  const key = `wc_fc_${dyn}_${f.numQbs}_${f.teams}_${f.ppr}`;
+  S.values = {}; S.picks = [];
+  let rows = lsGet(key, 6*3600*1000);
+  if (!rows) {
+    try {
+      rows = await getJSON(`${FC}?isDynasty=${dyn}&numQbs=${f.numQbs}&numTeams=${f.teams}&ppr=${f.ppr}`);
+      if (Array.isArray(rows) && rows.length) lsSet(key, rows); else rows = null;
+    } catch { rows = null; }
+  }
+  if (rows) {
+    S.source = "fantasycalc";
+    for (const row of rows) {
+      const sid = row?.player?.sleeperId;
+      const entry = { v: row.value || 0, ovr: row.overallRank ?? null,
+        pr: row.positionRank ?? null, tr: row.trend30Day ?? 0,
+        pos: row?.player?.position || null, name: row?.player?.name || null };
+      if (sid != null && sid !== "") S.values[String(sid)] = entry;
+      else if (dyn && /\b20\d{2}\b/.test(entry.name || "") ) S.picks.push(entry);
+    }
+    S.picks.sort((a,b) => b.v - a.v);
+  } else {
+    // Fallback: estimate from Sleeper's own search rank (exponential decay onto a 0–10k scale).
+    S.source = "estimate";
+    for (const [id, p] of Object.entries(S.players)) {
+      if (p.r == null) continue;
+      const v = Math.round(9999 * Math.exp(-(p.r - 1) / 85));
+      if (v >= 5) S.values[id] = { v, ovr: p.r, pr: null, tr: 0, pos: p.p, name: p.n };
+    }
+  }
+  $("#srcPill").textContent = S.source === "fantasycalc"
+    ? `values: FantasyCalc (${dyn ? "dynasty" : "redraft"})` : "values: estimated";
+  $("#srcPill").classList.toggle("warn", S.source === "estimate");
+}
+const val = (id) => S.values[id]?.v || 0;
+
+/* =============================== derived =============================== */
+function teamName(rid) {
+  const roster = S.rosters.find(r => r.roster_id === rid);
+  const u = S.lusers.find(u => u.user_id === roster?.owner_id);
+  return u?.metadata?.team_name || u?.display_name || `Roster ${rid}`;
+}
+function starterValue(roster) {
+  const slots = (S.league?.roster_positions || []).filter(s => !["BN","IR","TAXI"].includes(s));
+  const pool = new Map((roster.players || []).filter(id => id && id !== "0")
+    .map(id => [id, { pos: pinfo(id).p, v: val(id) }]));
+  // Single-position slots claim first, flexes after, best value wins each slot.
+  const order = [...slots].sort((a,b) =>
+    (POS_SLOTS[a]?.length || 9) - (POS_SLOTS[b]?.length || 9));
+  let total = 0;
+  for (const slot of order) {
+    const ok = POS_SLOTS[slot]; if (!ok) continue;
+    let best = null;
+    for (const [id, p] of pool) if (ok.includes(p.pos) && (!best || p.v > pool.get(best).v)) best = id;
+    if (best) { total += pool.get(best).v; pool.delete(best); }
+  }
+  return total;
+}
+function teamSummaries() {
+  return S.rosters.map(r => {
+    const ids = (r.players || []).filter(id => id && id !== "0");
+    const byPos = { QB:0, RB:0, WR:0, TE:0, OTH:0 };
+    const assets = [];
+    let ageWt = 0, ageV = 0;
+    for (const id of ids) {
+      const p = pinfo(id), v = val(id);
+      byPos[GROUPS.includes(p.p) ? p.p : "OTH"] += v;
+      assets.push({ id, name: p.n, pos: p.p, v });
+      if (p.a && v) { ageWt += p.a * v; ageV += v; }
+    }
+    assets.sort((a,b) => b.v - a.v);
+    const total = Object.values(byPos).reduce((a,b) => a+b, 0);
+    return { rid: r.roster_id, name: teamName(r.roster_id), roster: r, total, byPos,
+      starters: starterValue(r), assets, age: ageV ? ageWt/ageV : null,
+      me: r.roster_id === S.myRosterId };
+  }).sort((a,b) => b.total - a.total);
+}
+
+/* =============================== tooltip =============================== */
+const tt = $("#tooltip");
+function showTT(html, ev) { tt.innerHTML = html; tt.style.display = "block"; moveTT(ev); }
+function moveTT(ev) {
+  const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - pad;
+  tt.style.left = x + "px"; tt.style.top = y + "px";
+}
+function hideTT() { tt.style.display = "none"; }
+
+/* =============================== views =============================== */
+function setStatus(msg) { const s = $("#status");
+  if (!msg) { s.classList.add("hidden"); return; }
+  s.classList.remove("hidden"); s.innerHTML = `<span class="spin"></span>${esc(msg)}`; }
+function banner(msg, isErr) { $("#banner").innerHTML = msg
+  ? `<div class="banner${isErr ? " err" : ""}">${msg}</div>` : ""; }
+
+function render() {
+  const v = $("#view"); v.innerHTML = "";
+  document.querySelectorAll("nav.tabs button").forEach(b =>
+    b.classList.toggle("on", b.dataset.tab === S.tab));
+  if (!S.league) return;
+  ({ power: renderPower, rosters: renderRosters, trade: renderTrade,
+     standings: renderStandings, market: renderMarket }[S.tab])(v);
+}
+
+/* ---------- power rankings ---------- */
+function renderPower(v) {
+  const teams = teamSummaries();
+  const mine = teams.find(t => t.me);
+  const sr = [...teams].sort((a,b) => b.starters - a.starters);
+  const stats = el("div", "statrow");
+  if (mine) {
+    stats.append(
+      statTile("Your team value", fmt(mine.total), `#${teams.indexOf(mine)+1} of ${teams.length} overall`),
+      statTile("Your starters", fmt(mine.starters), `#${sr.indexOf(mine)+1} starting lineup`),
+      statTile("Weighted age", mine.age ? mine.age.toFixed(1) : "—",
+        mine.age ? (mine.age < avgAge(teams) ? "younger than league avg" : "older than league avg") : ""),
+      statTile("Top asset", mine.assets[0] ? mine.assets[0].name : "—",
+        mine.assets[0] ? `${fmt(mine.assets[0].v)} — ${esc(mine.assets[0].pos)}` : ""));
+  }
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Roster value power rankings"),
+    el("div", "sub", "Total roster value by position group — hover a segment for the pieces"));
+  const legend = el("div", "legend");
+  for (const g of GROUPS) legend.append(el("span", "key",
+    `<span class="swatch" style="background:var(${GROUP_VARS[g]})"></span>${g}`));
+  legend.append(el("span", "key",
+    `<span class="swatch" style="background:var(--baseline)"></span>Other`));
+  card.append(legend);
+
+  const max = Math.max(...teams.map(t => t.total), 1);
+  teams.forEach((t, i) => {
+    const row = el("div", "prow");
+    row.append(el("div", "rank", String(i+1)),
+      el("div", "team", esc(t.name) + (t.me ? '<span class="you">YOU</span>' : "")));
+    const bar = el("div", "bar");
+    const segs = [...GROUPS.map(g => [g, t.byPos[g], `var(${GROUP_VARS[g]})`]),
+                  ["Other", t.byPos.OTH, "var(--baseline)"]].filter(s => s[1] > 0);
+    for (const [g, amt, color] of segs) {
+      const seg = el("div", "segm");
+      seg.style.width = (amt / max * 100) + "%";
+      seg.style.background = color;
+      const top = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "Other") === g).slice(0, 3);
+      const html = `<div class="tt-title">${esc(t.name)} — ${g}: ${fmt(amt)}</div>` +
+        top.map(a => `<div class="tt-row"><span>${esc(a.name)}</span><span>${fmt(a.v)}</span></div>`).join("");
+      seg.addEventListener("mousemove", ev => showTT(html, ev));
+      seg.addEventListener("mouseleave", hideTT);
+      // Touch has no hover: tap a segment to pin the same tooltip.
+      seg.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+      bar.append(seg);
+    }
+    row.append(bar, el("div", "val", fmt(t.total)));
+    card.append(row);
+  });
+  v.append(card);
+}
+function statTile(lab, valTxt, sub) {
+  const s = el("div", "stat");
+  s.append(el("div", "lab", esc(lab)), el("div", "val", esc(valTxt)), el("div", "sub", sub || ""));
+  return s;
+}
+const avgAge = (teams) => { const withAge = teams.filter(t => t.age);
+  return withAge.reduce((a,t) => a + t.age, 0) / (withAge.length || 1); };
+
+/* ---------- rosters ---------- */
+function renderRosters(v) {
+  const teams = teamSummaries();
+  const sel = el("select");
+  teams.forEach(t => { const o = el("option", null,
+    esc(t.name) + (t.me ? " (you)" : "")); o.value = t.rid; sel.append(o); });
+  sel.value = (S.rosterView ?? (teams.find(t => t.me) || teams[0]).rid);
+  S.rosterView = Number(sel.value);
+  sel.addEventListener("change", () => { S.rosterView = Number(sel.value); render(); });
+  const bar = el("div", "controls"); bar.append(sel); v.append(bar);
+
+  const t = teams.find(x => x.rid === S.rosterView) || teams[0];
+  const starterIds = new Set((t.roster.starters || []).filter(id => id && id !== "0"));
+  const card = el("div", "card");
+  card.append(el("h2", null, esc(t.name)),
+    el("div", "sub", `${fmt(t.total)} total · ${fmt(t.starters)} starters · ` +
+      (t.age ? `${t.age.toFixed(1)} value-weighted age` : "age n/a")));
+  const maxV = Math.max(...t.assets.map(a => a.v), 1);
+  const tbl = el("table", "posgroup");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
+    <th class="num">Pos rk</th><th style="width:38%">Value</th><th class="num">30d</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const g of [...GROUPS, "OTH"]) {
+    const rows = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "OTH") === g);
+    if (!rows.length) continue;
+    tb.append(el("tr", null, `<td class="gh" colspan="6">${g === "OTH" ? "Other" : g}</td>`));
+    for (const a of rows) {
+      const p = pinfo(a.id), fcv = S.values[a.id];
+      const tr30 = fcv?.tr || 0;
+      const trTxt = !tr30 ? '<span style="color:var(--ink-muted)">·</span>'
+        : `<span class="${tr30 > 0 ? "delta-up" : "delta-down"}">${tr30 > 0 ? "▲" : "▼"} ${fmt(Math.abs(tr30))}</span>`;
+      tb.append(el("tr", null,
+        `<td>${esc(a.name)}${starterIds.has(a.id) ? ' <span class="posbadge">ST</span>' : ""}</td>
+         <td>${esc(p.t || "FA")}</td><td class="num">${p.a ?? "—"}</td>
+         <td class="num">${fcv?.pr ? esc((fcv.pos || p.p) + fcv.pr) : "—"}</td>
+         <td><span class="meter"><span class="track"><span class="fill" style="width:${a.v/maxV*100}%"></span></span>
+             <span class="mval">${a.v ? fmt(a.v) : "—"}</span></span></td>
+         <td class="num">${trTxt}</td>`));
+    }
+  }
+  tbl.append(tb); card.append(tbl); v.append(card);
+}
+
+/* ---------- trade calculator ---------- */
+function tradePool() {
+  const inLeague = new Map();
+  for (const r of S.rosters) for (const id of (r.players || []))
+    if (id && id !== "0") inLeague.set(id, teamName(r.roster_id));
+  const pool = [];
+  for (const [id, e] of Object.entries(S.values)) {
+    const p = pinfo(id);
+    pool.push({ kind:"player", id, name: e.name || p.n, pos: e.pos || p.p, v: e.v,
+      owner: inLeague.get(id) || null });
+  }
+  S.picks.forEach((pk, i) => pool.push({ kind:"pick", id:"pick"+i, name: pk.name, pos:"PICK", v: pk.v, owner:null }));
+  return pool.sort((a,b) => b.v - a.v);
+}
+function renderTrade(v) {
+  const pool = tradePool();
+  const wrap = el("div", "grid2");
+  wrap.append(tradeSide("a", "Side A", pool), tradeSide("b", "Side B", pool));
+  v.append(wrap);
+
+  const a = S.trade.a.reduce((s,x) => s + x.v, 0), b = S.trade.b.reduce((s,x) => s + x.v, 0);
+  const card = el("div", "card verdict");
+  card.append(el("h2", null, "Verdict"));
+  if (!a && !b) card.append(el("div", "empty", "Add players or picks to both sides to compare."));
+  else {
+    const total = a + b || 1;
+    const bar = el("div", "vbar");
+    const ad = el("div", "a"), bd = el("div", "b");
+    ad.style.width = (a/total*100) + "%"; bd.style.width = (b/total*100) + "%";
+    bar.append(ad, bd); card.append(bar);
+    card.append(el("div", "vlabels",
+      `<span><span class="swatch" style="background:var(--s1)"></span> Side A · ${fmt(a)}</span>
+       <span>Side B · ${fmt(b)} <span class="swatch" style="background:var(--s2)"></span></span>`));
+    const diff = Math.abs(a-b), pct = diff / Math.max(a,b) * 100;
+    const lead = a > b ? "Side A" : "Side B";
+    const msg = pct < 5 ? "Dead even — fair trade" :
+      pct < 12 ? `${lead} wins slightly` : `${lead} wins clearly`;
+    card.append(el("div", "vmsg",
+      `${esc(msg)}<span class="sub">difference ${fmt(diff)} (${pct.toFixed(1)}%)` +
+      (diff > 0 ? ` — ${a<b ? "Side A" : "Side B"} needs ~${fmt(diff)} more value to even it` : "") +
+      `</span>`));
+  }
+  v.append(card);
+}
+function tradeSide(side, label, pool) {
+  const box = el("div", "tside");
+  box.append(el("h3", null,
+    `<span class="swatch" style="background:var(${side === "a" ? "--s1" : "--s2"})"></span>${label}`));
+  const search = el("div", "tsearch");
+  const inp = el("input"); inp.placeholder = "Search players or picks…";
+  const sugg = el("div", "sugg hidden");
+  inp.addEventListener("input", () => {
+    const q = inp.value.trim().toLowerCase();
+    sugg.innerHTML = ""; sugg.classList.toggle("hidden", q.length < 2);
+    if (q.length < 2) return;
+    const taken = new Set([...S.trade.a, ...S.trade.b].map(x => x.id));
+    pool.filter(p => !taken.has(p.id) && p.name.toLowerCase().includes(q)).slice(0, 8)
+      .forEach(p => {
+        const b = el("button", null,
+          `<span class="posbadge">${esc(p.pos)}</span> ${esc(p.name)}` +
+          (p.owner ? ` <span style="color:var(--ink-muted);font-size:11px">· ${esc(p.owner)}</span>` : "") +
+          `<span class="sv">${fmt(p.v)}</span>`);
+        b.addEventListener("click", () => { S.trade[side].push(p); render(); });
+        sugg.append(b);
+      });
+    if (!sugg.children.length) sugg.append(el("div", "empty", "No match"));
+  });
+  search.append(inp, sugg); box.append(search);
+  S.trade[side].forEach((p, i) => {
+    const a = el("div", "asset",
+      `<span class="posbadge">${esc(p.pos)}</span> ${esc(p.name)}
+       <span class="av">${fmt(p.v)}</span>`);
+    const rm = el("button", "rm", "✕");
+    rm.addEventListener("click", () => { S.trade[side].splice(i, 1); render(); });
+    a.append(rm); box.append(a);
+  });
+  const sum = S.trade[side].reduce((s,x) => s + x.v, 0);
+  box.append(el("div", "total", sum ? fmt(sum) : ""));
+  return box;
+}
+
+/* ---------- standings ---------- */
+function renderStandings(v) {
+  const card = el("div", "card");
+  card.append(el("h2", null, "Standings"),
+    el("div", "sub", `${esc(S.league.name)} · ${esc(S.season)} season`));
+  const pts = (s, pre) => (s?.[pre] || 0) + (s?.[pre + "_decimal"] || 0) / 100;
+  const rows = [...S.rosters].sort((x,y) =>
+    (y.settings?.wins||0) - (x.settings?.wins||0) || pts(y.settings,"fpts") - pts(x.settings,"fpts"));
+  const anyGames = rows.some(r => (r.settings?.wins||0) + (r.settings?.losses||0) > 0);
+  if (!anyGames) { card.append(el("div", "empty",
+    "No games played yet this season — standings appear after week 1.")); v.append(card); return; }
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>#</th><th>Team</th><th class="num">W</th>
+    <th class="num">L</th><th class="num">PF</th><th class="num">PA</th></tr></thead>`;
+  const tb = el("tbody");
+  rows.forEach((r, i) => {
+    const s = r.settings || {};
+    tb.append(el("tr", r.roster_id === S.myRosterId ? "me" : null,
+      `<td>${i+1}</td><td>${esc(teamName(r.roster_id))}${r.roster_id === S.myRosterId ? ' <span class="you posbadge">YOU</span>' : ""}</td>
+       <td class="num">${s.wins||0}</td><td class="num">${s.losses||0}</td>
+       <td class="num">${pts(s,"fpts").toFixed(1)}</td><td class="num">${pts(s,"fpts_against").toFixed(1)}</td>`));
+  });
+  tbl.append(tb); card.append(tbl); v.append(card);
+}
+
+/* ---------- market ---------- */
+async function renderMarket(v) {
+  v.append(el("div", "status", '<span class="spin"></span>Loading market movers…'));
+  let adds = [], drops = [];
+  try { [adds, drops] = await Promise.all([
+    sleeper("/players/nfl/trending/add?lookback_hours=24&limit=12"),
+    sleeper("/players/nfl/trending/drop?lookback_hours=24&limit=12")]); } catch {}
+  if (S.tab !== "market") return;
+  v.innerHTML = "";
+  const wrap = el("div", "grid2");
+  wrap.append(marketCard("Hottest adds (24h)", adds || [], "add"),
+              marketCard("Most dropped (24h)", drops || [], "drop"));
+  v.append(wrap);
+}
+function marketCard(title, rows, kind) {
+  const card = el("div", "card");
+  card.append(el("h2", null, esc(title)),
+    el("div", "sub", "Sleeper waiver activity across all leagues · value = trade value"));
+  if (!rows.length) { card.append(el("div", "empty", "Market data unavailable right now.")); return card; }
+  const max = Math.max(...rows.map(r => r.count || 0), 1);
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th style="width:40%">${kind === "add" ? "Adds" : "Drops"}</th>
+    <th class="num">Count</th><th class="num">Value</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const r of rows) {
+    const p = pinfo(String(r.player_id));
+    tb.append(el("tr", null,
+      `<td>${esc(p.n)} <span class="posbadge">${esc(p.p)}</span></td>
+       <td><span class="meter"><span class="track"><span class="fill" style="width:${(r.count||0)/max*100}%"></span></span></span></td>
+       <td class="num">${fmt(r.count || 0)}</td>
+       <td class="num">${val(String(r.player_id)) ? fmt(val(String(r.player_id))) : "—"}</td>`));
+  }
+  tbl.append(tb); card.append(tbl);
+  return card;
+}
+
+/* =============================== boot / flows =============================== */
+async function loadEverything(username) {
+  banner("");
+  $("#tabs").classList.add("hidden"); $("#controls").classList.add("hidden");
+  $("#view").innerHTML = "";
+  try {
+    setStatus(`Looking up ${username}…`);
+    const user = await sleeper(`/user/${encodeURIComponent(username)}`);
+    if (!user) { setStatus(null);
+      banner(`Sleeper user <b>${esc(username)}</b> not found — check the spelling.`, true); return; }
+    S.user = user; S.username = user.username || username;
+    const av = $("#uavatar");
+    if (user.avatar && !DEMO) { av.src = `${CDN}/avatars/thumbs/${user.avatar}`; av.classList.remove("hidden"); }
+    else av.classList.add("hidden");
+
+    setStatus("Finding your leagues…");
+    const state = await sleeper("/state/nfl") || {};
+    let season = String(state.league_season || state.season || new Date().getFullYear());
+    let leagues = await sleeper(`/user/${user.user_id}/leagues/nfl/${season}`) || [];
+    if (!leagues.length) {
+      const prev = String(Number(season) - 1);
+      leagues = await sleeper(`/user/${user.user_id}/leagues/nfl/${prev}`) || [];
+      if (leagues.length) { season = prev;
+        banner(`No ${esc(String(Number(prev)+1))} leagues yet — showing your <b>${esc(prev)}</b> leagues.`); }
+    }
+    S.season = season; S.leagues = leagues;
+    if (!leagues.length) { setStatus(null);
+      banner(`<b>${esc(S.username)}</b> has no NFL leagues in ${esc(season)}.`, true); return; }
+
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get("league");
+    await pickLeague(leagues.find(l => l.league_id === wanted) || leagues[0]);
+  } catch (e) {
+    setStatus(null);
+    banner(`Couldn't reach the Sleeper API (${esc(e.message || e)}). ` +
+      `If you opened this file directly, try serving it: <code>python3 -m http.server</code>`, true);
+  }
+}
+async function pickLeague(league) {
+  S.league = league; S.trade = { a:[], b:[] }; S.rosterView = null;
+  const chips = $("#leagueChips"); chips.innerHTML = "";
+  S.leagues.forEach(l => {
+    const c = el("button", "chip" + (l.league_id === league.league_id ? " on" : ""), esc(l.name));
+    c.addEventListener("click", () => pickLeague(l));
+    chips.append(c);
+  });
+  try {
+    setStatus(`Loading ${league.name}…`);
+    const [rosters, lusers] = await Promise.all([
+      sleeper(`/league/${league.league_id}/rosters`),
+      sleeper(`/league/${league.league_id}/users`)]);
+    S.rosters = rosters || []; S.lusers = lusers || [];
+    const mine = S.rosters.find(r =>
+      r.owner_id === S.user.user_id || (r.co_owners || []).includes(S.user.user_id));
+    S.myRosterId = mine ? mine.roster_id : null;
+
+    await loadPlayers();
+    setStatus("Loading trade values…");
+    await loadValues();
+
+    const f = leagueFormat();
+    $("#fmtPill").textContent =
+      `${f.numQbs === 2 ? "Superflex" : "1QB"} · ${f.ppr === 1 ? "PPR" : f.ppr === 0.5 ? "Half PPR" : f.ppr + " PPR"}` +
+      (f.tep ? " · TEP" : "") + ` · ${f.teams} tm`;
+    // Shareable deep link. Sandboxed hosts can refuse replaceState — not fatal.
+    if (!DEMO) try {
+      const url = new URL(location); url.searchParams.set("user", S.username);
+      url.searchParams.set("league", league.league_id); history.replaceState(null, "", url);
+    } catch {}
+
+    setStatus(null);
+    $("#controls").classList.remove("hidden");
+    $("#tabs").classList.remove("hidden");
+    render();
+  } catch (e) {
+    setStatus(null);
+    banner(`Couldn't load that league (${esc(e.message || e)}).`, true);
+  }
+}
+
+/* ---------- wire up ---------- */
+document.addEventListener("click", hideTT);   // tap anywhere to dismiss a pinned tooltip
+document.querySelectorAll("nav.tabs button").forEach(b =>
+  b.addEventListener("click", () => { S.tab = b.dataset.tab; render(); }));
+$("#modeSeg").querySelectorAll("button").forEach(b =>
+  b.addEventListener("click", async () => {
+    if (S.mode === b.dataset.mode) return;
+    S.mode = b.dataset.mode;
+    $("#modeSeg").querySelectorAll("button").forEach(x =>
+      x.classList.toggle("on", x === b));
+    setStatus("Reloading values…"); await loadValues(); setStatus(null); render();
+  }));
+/* localStorage throws in some sandboxed embeddings — never let it break a click. */
+const remember = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const recall = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+$("#loadBtn").addEventListener("click", () => {
+  const u = $("#uname").value.trim(); if (u) { remember("wc_user", u); loadEverything(u); }
+});
+$("#uname").addEventListener("keydown", e => { if (e.key === "Enter") $("#loadBtn").click(); });
+$("#themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  remember("wc_theme", next);
+});
+
+(function boot() {
+  const savedTheme = recall("wc_theme");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  const qs = new URLSearchParams(location.search);
+  const u = DEMO ? DEMO.user.display_name
+    : (qs.get("user") || recall("wc_user") || "PaySuk34");
+  $("#uname").value = u;
+  if (DEMO) { $("#uname").disabled = true; $("#loadBtn").disabled = true;
+    $("#uname").title = "Fixed in the preview — the live site loads any username"; }
+  loadEverything(u);
+})();
+</script>
+</body>
+</html>
