@@ -340,12 +340,12 @@ function demoRoute(url) {
   if (m) return (DEMO.leagueData[m[1]] || {})[m[2]] ?? [];
   return null;
 }
-async function getJSON(url, timeoutMs=20000) {
+async function getJSON(url, timeoutMs=20000, init) {
   if (DEMO) return demoRoute(url);
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { signal: ctl.signal });
+    const r = await fetch(url, { signal: ctl.signal, ...(init || {}) });
     if (r.status === 404) return null;
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
@@ -460,7 +460,11 @@ async function loadStatsFor(season) {
    snapshot, not a live feed — the UI says so rather than implying otherwise. */
 async function loadSignals() {
   try {
-    const blob = await getJSON("./data/signals.json", 15000);
+    // Always revalidate. A weekly job rewrites this file, and Pages caches it
+    // hard enough that returning visitors would keep reading a stale snapshot
+    // long after the refresh landed. no-cache still gets a cheap 304 when it
+    // has not moved — it is the staleness that is expensive, not the request.
+    const blob = await getJSON("./data/signals.json", 15000, { cache: "no-cache" });
     if (blob && blob.players) { S.sig = blob.players; S.sigMeta = blob.meta || null; return; }
   } catch {}
   S.sig = {}; S.sigMeta = null;
