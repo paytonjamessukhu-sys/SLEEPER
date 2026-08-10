@@ -9,6 +9,22 @@ username **PaySuk34**. Two things live here:
 
 **Live:** https://paytonjamessukhu-sys.github.io/sleeper/
 
+## Deploying
+
+Both deploy targets auto-deploy on every push to `main` — push an update,
+the live site picks it up with no further action.
+
+- **GitHub Pages** — `.github/workflows/pages.yml` builds and deploys on
+  every push. One-time setup per repo: **Settings → Pages → Source →
+  GitHub Actions** (GitHub requires a human, not a workflow, to flip this
+  the first time — it's the guardrail that stops a workflow from silently
+  turning a repo into a public site). After that it's fully automatic.
+- **Render** — `render.yaml` is a [Blueprint](https://render.com/docs/blueprint-spec)
+  for a static-site service with `autoDeploy: true`. One-time setup:
+  Render dashboard → **New + → Blueprint** (or **New + → Static Site**,
+  simpler and schema-risk-free — build command blank, publish directory `.`)
+  → connect this repo. After that, every push redeploys automatically.
+
 ## Warchest (the site)
 
 Visit the live link above, or run it locally — everything loads in your browser,

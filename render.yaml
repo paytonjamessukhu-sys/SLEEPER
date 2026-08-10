@@ -1,0 +1,26 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Static site, no build step (index.html is hand-authored, not compiled).
+# autoDeploy: true is Render's own default for any git-connected service, but
+# it's pinned here explicitly so "deploy on every push" stays true even if
+# someone changes it by hand in the dashboard later without realizing.
+#
+# This file only takes effect once the repo is connected on Render's side
+# (New + -> Blueprint, pick this repo) -- render.yaml can't provision itself,
+# that one connection has to happen through Render's dashboard.
+services:
+  - type: web
+    name: warchest
+    runtime: static
+    branch: main
+    buildCommand: ""
+    staticPublishPath: .
+    autoDeploy: true
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
