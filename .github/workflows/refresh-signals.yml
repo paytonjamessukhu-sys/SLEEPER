@@ -1,0 +1,56 @@
+name: Refresh signals
+
+# The opportunity data behind the buy/sell board is a baked snapshot, because a
+# browser cannot fetch nflverse directly (its release assets carry no CORS
+# headers). A runner has no such restriction, so it rebuilds the file here.
+#
+# Wednesday morning is deliberate: the NFL week's stats have settled by then,
+# including Monday night, so a mid-season refresh picks up a complete week.
+
+on:
+  schedule:
+    - cron: "0 11 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-signals
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rebuild signals
+        run: python3 tools_build_signals.py
+
+      - name: Commit if the data actually changed
+        run: |
+          if git diff --quiet -- data/signals.json; then
+            echo "No change in signals — nothing to publish."
+            exit 0
+          fi
+          # The builder exits non-zero on an implausible join, so reaching here
+          # means the file is both different and sane.
+          python3 -c "
+          import json,sys
+          d=json.load(open('data/signals.json'))
+          n=len(d['players'])
+          assert n >= 400, f'only {n} players'
+          print(f'{n} players, latest season {d[\"meta\"][\"latest\"]}')
+          "
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/signals.json
+          git commit -m "Refresh nflverse signals ($(date -u +%Y-%m-%d))"
+          git push

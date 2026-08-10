@@ -575,10 +575,19 @@ function computeEdges() {
 function edgeTag(id) {
   const e = S.edges[id];
   if (!e) return { cls:"nosample", txt:"—", why:"Not in the graded pool." };
-  if (e.edge == null) return { cls:"nosample", txt:"NOT GRADED",
-    why: e.smallCohort ? `Too few ${e.pos}s his age to build a fair comparison.`
-       : e.gp ? `Only ${e.gp} game${e.gp === 1 ? "" : "s"} played — too thin to grade.`
-       : "No games in the baseline season, so there is nothing to price against — rookies and full-season injuries land here." };
+  if (e.edge == null) {
+    // A player with no snaps is not unknowable — where he was drafted is real
+    // information, and it is the only thing a rookie has. Say that, rather than
+    // filing the entire incoming class under "no data".
+    const d = draftRead(id);
+    if (!e.gp && d) return {
+      cls: d.strong ? "buy" : "hold", txt: d.strong ? "CAPITAL" : "LOW CAPITAL",
+      why: `No NFL production to judge yet. ${d.why} Draft position is the only signal here, so this is a prior, not a grade.` };
+    return { cls:"nosample", txt:"NOT GRADED",
+      why: e.smallCohort ? `Too few ${e.pos}s his age to build a fair comparison.`
+         : e.gp ? `Only ${e.gp} game${e.gp === 1 ? "" : "s"} played — too thin to grade.`
+         : "No games in the baseline season, so there is nothing to price against." };
+  }
   const age = pinfo(id).a, tr = S.values[id]?.tr || 0, v = val(id);
   // Both floors matter. The implied floor keeps deep-bench noise out; the floor on
   // his ACTUAL price keeps out players the market has written off entirely — a man
@@ -651,6 +660,92 @@ function luckRead(id) {
     why:"Touchdowns landed about where his volume said they should." };
 }
 
+/* Draft capital, the only real signal a player with no NFL snaps has. The
+   evidence behind it is strongest at receiver — most top-50 fantasy WRs came out
+   of the first three rounds — and admittedly murkier at running back, where the
+   league's own devaluation of the position muddies it. The read says which. */
+const CAPITAL = [[15,"premium","a top-15 pick"], [45,"early","a first or second rounder"],
+                 [105,"mid","a day-two pick"], [999,"late","a late-round pick"]];
+function draftRead(id) {
+  const e = S.edges[id], d = e?.draft || S.sig?.[id]?.d;
+  if (!d) return null;
+  const [, tier, phrase] = CAPITAL.find(c => d.pk <= c[0]) || CAPITAL[3];
+  const pos = e?.pos || S.sig?.[id]?.pos;
+  const strong = tier === "premium" || tier === "early";
+  const caveat = pos === "RB"
+    ? " Draft capital is a weaker guide at running back than anywhere else."
+    : pos === "WR" && strong
+      ? " Draft capital carries most at receiver, where nearly all top-50 fantasy seasons come from the first three rounds."
+      : "";
+  return { tier, strong, txt: `R${d.rd}.${String(d.pk).padStart(2,"0")}`,
+    why: `${d.yr} draft, ${phrase} (round ${d.rd}, pick ${d.pk}).${caveat}` };
+}
+
+/* Usage direction. A player whose opportunity is climbing is the one worth
+   getting to before the scoring catches up; opportunity moves before points do. */
+function usageTrend(id) {
+  const sg = S.sig?.[id];
+  const yrs = S.sigMeta?.seasons;
+  if (!sg || !yrs || yrs.length < 2) return null;
+  const cur = sg.s?.[S.sigMeta.latest];
+  const prevYr = [...yrs].filter(y => y !== S.sigMeta.latest).sort().pop();
+  const prev = sg.s?.[prevYr];
+  if (!cur || !prev) return null;
+  const pos = sg.pos;
+  const pick = (s) => pos === "RB" ? (s.car || 0) + (s.tgt || 0)
+    : pos === "QB" ? (s.snp ?? 0) * 100 : (s.wopr ?? 0) * 100;
+  const a = pick(prev), b = pick(cur);
+  if (!a && !b) return null;
+  const d = b - a;
+  const unit = pos === "RB" ? "touches/gm" : pos === "QB" ? "pts of snap share" : "pts of WOPR";
+  const big = Math.abs(d) >= (pos === "RB" ? 3 : 8);
+  return { d, big, dir: d > 0 ? "up" : d < 0 ? "down" : "flat",
+    txt: (d > 0 ? "▲" : d < 0 ? "▼" : "·") + " " + Math.abs(d).toFixed(pos === "RB" ? 1 : 0),
+    why: `Usage ${d > 0 ? "climbed" : "fell"} ${Math.abs(d).toFixed(1)} ${unit} from ${esc(prevYr)} to ${esc(S.sigMeta.latest)}.` };
+}
+
+/* Where a player sits on his position's age curve. The shapes are well
+   established even if the exact ages shift a year either way by study: backs
+   peak early and fall off a cliff, receivers peak later and hold on far longer,
+   tight ends peak latest of all. */
+const CURVES = {
+  RB: { peak:[24,26], cliff:29, note:"Backs peak at 24–26; nearly every peak season happens before 29." },
+  WR: { peak:[26,28], cliff:31, note:"Receivers peak around 26–28 and hold value years longer than backs." },
+  TE: { peak:[26,29], cliff:32, note:"Tight ends peak latest and hold the longest window of the skill positions." },
+  QB: { peak:[27,32], cliff:37, note:"Quarterbacks hold value longest of anyone." },
+};
+function ageRead(id) {
+  const p = pinfo(id), e = S.edges[id];
+  const pos = e?.pos || S.sig?.[id]?.pos;
+  const c = CURVES[pos];
+  if (!c || !p.a) return null;
+  const a = p.a;
+  if (a < c.peak[0]) return { cls:"diamond", txt:"ASCENDING", why:`${a} — still short of the ${pos} peak. ${c.note}` };
+  if (a <= c.peak[1]) return { cls:"buy", txt:"PEAK", why:`${a} — squarely in the ${pos} peak window. ${c.note}` };
+  if (a < c.cliff) return { cls:"hold", txt:"POST-PEAK", why:`${a} — past the peak but before the drop. ${c.note}` };
+  return { cls:"sell", txt:"CLIFF", why:`${a} — past the age where ${pos}s hold value. ${c.note}` };
+}
+
+/* The classic post-hype shape: real draft capital, still young, has not produced,
+   and the market has stopped paying for him. The community treats this as a known
+   inefficiency; the honest caveat is that it is far less rigorously demonstrated
+   than touchdown regression, so it is surfaced as a question, not a verdict. */
+function postHype(id) {
+  const e = S.edges[id], d = draftRead(id), p = pinfo(id);
+  if (!e || !d || !d.strong || !p.a || p.a > 25) return null;
+  // Skill positions only. A quarterback's opportunity is binary — he starts or
+  // he does not — and WOPR is ~0 for all of them, so judging QBs on it flags
+  // every young passer in the league, starters included.
+  if (!["RB","WR","TE"].includes(e.pos)) return null;
+  const sg = S.sig?.[id]?.s?.[S.sigMeta?.latest];
+  if (!sg || sg.g < 6) return null;
+  const weak = (e.pos === "RB" ? (sg.car + sg.tgt) < 10 : (sg.wopr ?? 0) < 0.45);
+  const v = val(id);
+  if (!weak || v > 3000 || v < 300) return null;   // too dear to be forgotten, too cheap to matter
+  return { why: `Real draft capital (${d.txt}), still only ${p.a}, and the market has stopped paying for him. ` +
+    `That is the shape a post-hype breakout takes — though this pattern is community lore more than proven research, so treat it as a question worth asking.` };
+}
+
 /* The board score: usage he has earned, luck he has not, and a price that has
    not caught up. Deliberately additive and inspectable rather than a fitted model —
    every point of it can be read off the row it came from. */
@@ -661,6 +756,25 @@ function boardScore(id) {
   const oppBoost = { elite: 1.0, strong: 0.6, rotational: 0.25, thin: 0 }[o.tier] ?? 0;
   // Unlucky players score higher on the buy board, lucky ones on the sell board.
   return e.edge + (-l * 220) + (oppBoost * 900);
+}
+/* Everything the app knows about one player, as sentences. Assembled in one
+   place so the board, the wire and the roster all explain themselves identically. */
+function fullRead(id, extra) {
+  const name = S.values[id]?.name || pinfo(id).n;
+  const parts = [];
+  const push = (s) => { if (s) parts.push(`<div class="tt-row"><span>${esc(s)}</span></div>`); };
+  const o = opportunity(id), l = luckRead(id), t = usageTrend(id),
+        a = ageRead(id), d = draftRead(id), ph = postHype(id);
+  push(edgeTag(id).why);
+  if (o) push(o.why);
+  if (l) push(l.why);
+  if (t && t.big) push(t.why);
+  if (a) push(a.why);
+  if (d && !S.edges[id]?.gp) push(null);            // already said in the tag
+  else if (d && d.strong) push(d.why);
+  if (ph) push(ph.why);
+  (extra || []).forEach(push);
+  return `<div class="tt-title">${esc(name)}</div>` + parts.join("");
 }
 const edgeCell = (id) => {
   const e = S.edges[id];
@@ -845,7 +959,7 @@ function renderRosters(v) {
          <td class="num">${trTxt}</td>
          <td>${GROUPS.includes(a.pos) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>` : ""}</td>`);
       if (GROUPS.includes(a.pos)) {
-        const html = `<div class="tt-title">${esc(a.name)}</div><div class="tt-row"><span>${esc(tag.why)}</span></div>`;
+        const html = fullRead(a.id);
         row.addEventListener("mousemove", ev => showTT(html, ev));
         row.addEventListener("mouseleave", hideTT);
         row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
@@ -1004,8 +1118,9 @@ function renderBoard(v) {
 
   const tbl = el("table");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Held by</th><th class="num">Age</th>
-    <th class="num">Usage</th><th>Tier</th><th class="num">Pts/gm</th><th class="num">Adj</th>
-    <th class="num">TD luck</th><th class="num">Value</th><th class="num">Edge</th></tr></thead>`;
+    <th class="num">Usage</th><th>Tier</th><th class="num">Trend</th><th class="num">Pts/gm</th>
+    <th class="num">Adj</th><th class="num">TD luck</th><th class="num">Value</th>
+    <th class="num">Edge</th><th>Age curve</th></tr></thead>`;
   const tb = el("tbody");
   for (const r of top) {
     const p = pinfo(r.id);
@@ -1016,16 +1131,17 @@ function renderBoard(v) {
        <td class="num">${p.a ?? "—"}</td>
        <td class="num">${esc(r.o.txt)} <span style="color:var(--ink-muted);font-size:11px">${esc(r.o.lab)}</span></td>
        <td><span class="tag ${tierCls}">${esc(r.o.tier.toUpperCase())}</span></td>
+       <td class="num">${(() => { const t = usageTrend(r.id); return t
+          ? `<span class="${t.dir === "up" ? "edge-pos" : t.dir === "down" ? "edge-neg" : ""}">${esc(t.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
        <td class="num">${r.e.rawPpg ? r.e.rawPpg.toFixed(1) : "—"}</td>
        <td class="num">${r.e.ppg ? r.e.ppg.toFixed(1) : "—"}</td>
        <td class="num"><span class="${r.l.cls === "buy" ? "edge-pos" : r.l.cls === "sell" ? "edge-neg" : ""}">${esc(r.l.txt)}</span></td>
        <td class="num">${fmt(val(r.id))}</td>
-       <td class="num">${edgeCell(r.id)}</td>`);
-    const html = `<div class="tt-title">${esc(r.name)} — why he is here</div>` +
-      `<div class="tt-row"><span>${esc(r.o.why)}</span></div>` +
-      `<div class="tt-row"><span>${esc(r.l.why)}</span></div>` +
-      `<div class="tt-row"><span>${esc(edgeTag(r.id).why)}</span></div>` +
-      (r.own && !r.own.mine ? `<div class="tt-row"><span>Held by ${esc(r.own.name)} — this is a trade, not an add.</span></div>` : "");
+       <td class="num">${edgeCell(r.id)}</td>
+       <td>${(() => { const a = ageRead(r.id); return a ? `<span class="tag ${a.cls}">${esc(a.txt)}</span>` : ""; })()}</td>`);
+    const html = fullRead(r.id, r.own && !r.own.mine
+      ? [`Held by ${r.own.name} — this is a trade, not a waiver add.`] : []);
     row.addEventListener("mousemove", ev => showTT(html, ev));
     row.addEventListener("mouseleave", hideTT);
     row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
@@ -1100,8 +1216,8 @@ function renderFreeAgents(v) {
   const tbl = el("table");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
     <th class="num">Pts/gm</th><th class="num">Gm</th><th class="num">Produces</th>
-    <th class="num">Priced</th><th class="num">Value</th><th class="num">Edge</th>
-    <th class="num">30d</th><th>Read</th></tr></thead>`;
+    <th class="num">Priced</th><th class="num">Trend</th><th class="num">Value</th>
+    <th class="num">Edge</th><th class="num">30d</th><th>Read</th></tr></thead>`;
   const tb = el("tbody");
   for (const p of rows) {
     const e = p.ed, tag = edgeTag(p.id);
@@ -1115,11 +1231,14 @@ function renderFreeAgents(v) {
        <td class="num">${e?.gp || "—"}</td>
        <td class="num">${e?.prodRank ? esc(p.pos + e.prodRank) : "—"}</td>
        <td class="num">${e?.priceRank ? esc(p.pos + e.priceRank) : "—"}</td>
+       <td class="num">${(() => { const t = usageTrend(p.id); return t
+          ? `<span class="${t.dir === "up" ? "edge-pos" : t.dir === "down" ? "edge-neg" : ""}">${esc(t.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
        <td class="num">${fmt(p.v)}</td>
        <td class="num">${edgeCell(p.id)}</td>
        <td class="num">${trTxt}</td>
        <td><span class="tag ${tag.cls}">${esc(tag.txt)}</span></td>`);
-    const html = `<div class="tt-title">${esc(p.name)}</div><div class="tt-row"><span>${esc(tag.why)}</span></div>`;
+    const html = fullRead(p.id);
     tr.addEventListener("mousemove", ev => showTT(html, ev));
     tr.addEventListener("mouseleave", hideTT);
     tr.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
