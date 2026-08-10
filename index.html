@@ -146,6 +146,13 @@ tr.me td { background: var(--accent-soft); }
 .tag.sell { color: var(--down); border: 1px solid var(--down); }
 .tag.hold { color: var(--ink-muted); border: 1px solid var(--baseline); }
 .tag.nosample { color: var(--ink-muted); border: 1px dashed var(--baseline); }
+.evidence { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  margin: 10px 0 14px; background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.evidence .ev-h { font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--ink-muted); margin-bottom: 8px; }
+.evidence .ev-row { display: flex; gap: 9px; align-items: flex-start;
+  font-size: 12px; color: var(--ink-2); margin-bottom: 5px; line-height: 1.4; }
+.evidence .ev-row .tag { flex: 0 0 auto; margin-top: 1px; }
 .edge-pos { color: var(--up); font-weight: 600; }
 .edge-neg { color: var(--down); font-weight: 600; }
 
@@ -761,6 +768,60 @@ function boardScore(id) {
   // Unlucky players score higher on the buy board, lucky ones on the sell board.
   return e.edge + (-l * 220) + (oppBoost * 900);
 }
+/* Next season's points per game, from a model fitted offline and baked in.
+   Shown with its measured error, because a single confident number would be a
+   lie: held out of sample it beats reusing last year's points by 7-13%, which
+   is a real edge and a modest one. */
+function projection(id) {
+  const p = S.sig?.[id]?.proj;
+  const m = S.sigMeta?.model;
+  if (p == null || !m) return null;
+  const err = m.rmse || 3.3;
+  return { ppg: p, lo: Math.max(0, p - err), hi: p + err, rmse: err, projects: m.projects,
+    why: `Projected ${p.toFixed(1)} points a game in ${m.projects}, give or take ${err.toFixed(1)}. ` +
+      `Fitted on the ${m.trainedOn} transition; out of sample it beats simply reusing last season by 7–13%.` };
+}
+
+/* Two independent markets, and the gap between them. FantasyCalc prices from
+   actual trades; DynastyProcess from expert consensus rankings. Agreement means
+   the price is settled. A wide gap means one of them is wrong, and that is a far
+   better mispricing signal than trusting either on its own. */
+function marketSplit(id) {
+  const r = S.mktRank?.[id];
+  if (!r) return null;
+  const d = r.dp - r.fc;                       // positive = consensus rates him lower
+  // Ranks near the bottom of a position are noise; a gap of a few places is not
+  // a disagreement. Both markets must roster him and the gap must be real.
+  if (Math.max(r.fc, r.dp) > 60 || Math.abs(d) < 8) return null;
+  return { fcRank: r.fc, dpRank: r.dp, gap: d, pos: r.pos,
+    dir: d > 0 ? "dear-here" : "cheap-here",
+    txt: (d > 0 ? "+" : "") + d,
+    why: d < 0
+      ? `FantasyCalc has him ${r.pos}${r.fc}; the expert consensus has him ${r.pos}${r.dp} — ${Math.abs(d)} places higher. Two independent markets disagree, and that gap is where mispricing lives.`
+      : `FantasyCalc has him ${r.pos}${r.fc} but the consensus has him only ${r.pos}${r.dp}, ${d} places lower. Worth knowing before you pay the trade-based price.` };
+}
+/* Rank each player inside each market separately. Comparing ranks rather than
+   values sidesteps the fact that the two shops use different scales AND
+   differently shaped curves — one multiplier cannot reconcile those, and trying
+   made every player look mispriced in the same direction. */
+function calibrateMarkets() {
+  const f = leagueFormat();
+  const fcBy = {}, dpBy = {};
+  for (const [id, sg] of Object.entries(S.sig || {})) {
+    const pos = sg.pos;
+    if (!GROUPS.includes(pos)) continue;
+    const v = val(id), o = f.numQbs === 2 ? (sg.dp?.v2 || sg.dp?.v1) : sg.dp?.v1;
+    if (v > 0 && o > 0) { (fcBy[pos] ||= []).push([id, v]); (dpBy[pos] ||= []).push([id, o]); }
+  }
+  S.mktRank = {};
+  for (const pos of Object.keys(fcBy)) {
+    const rank = (arr) => { const m = {};
+      [...arr].sort((a,b) => b[1]-a[1]).forEach(([id], i) => m[id] = i+1); return m; };
+    const rf = rank(fcBy[pos]), rd = rank(dpBy[pos]);
+    for (const id of Object.keys(rf)) S.mktRank[id] = { fc: rf[id], dp: rd[id], pos };
+  }
+}
+
 /* Everything the app knows about one player, as sentences. Assembled in one
    place so the board, the wire and the roster all explain themselves identically. */
 function fullRead(id, extra) {
@@ -768,8 +829,11 @@ function fullRead(id, extra) {
   const parts = [];
   const push = (s) => { if (s) parts.push(`<div class="tt-row"><span>${esc(s)}</span></div>`); };
   const o = opportunity(id), l = luckRead(id), t = usageTrend(id),
-        a = ageRead(id), d = draftRead(id), ph = postHype(id);
+        a = ageRead(id), d = draftRead(id), ph = postHype(id),
+        pj = projection(id), ms = marketSplit(id);
   push(edgeTag(id).why);
+  if (pj) push(pj.why);
+  if (ms && ms.dir !== "agree") push(ms.why);
   if (o) push(o.why);
   if (l) push(l.why);
   if (t && t.big) push(t.why);
@@ -1055,6 +1119,32 @@ function tradeSide(side, label, pool) {
   return box;
 }
 
+/* What has actually been tested, stated plainly. Every signal here was replayed
+   against two independent one-year windows of DynastyProcess price history,
+   each call compared against players of similar starting value. One of the
+   three came back inconsistent, and saying so is the point: a tool that only
+   advertises its wins is not an analytics tool, it is a sales pitch. */
+function evidenceNote() {
+  const ev = S.sigMeta?.evidence;
+  const box = el("div", "evidence");
+  if (!ev) { box.append(el("div", "sub", "No backtest recorded in this data file.")); return box; }
+  box.append(el("div", "ev-h", "What has been measured — and what has not"));
+  const row = (state, txt) => {
+    const d = el("div", "ev-row");
+    d.append(el("span", `tag ${state === "held" ? "buy" : state === "failed" ? "sell" : "hold"}`,
+      state === "held" ? "HELD UP" : state === "failed" ? "DID NOT" : "MODEST"),
+      el("span", null, esc(txt)));
+    box.append(d);
+  };
+  if (ev.edgeBuy) row("held", `${ev.edgeBuy.claim} Beat them by ${ev.edgeBuy.windows.map(w=>w+"%").join(" and ")} ` +
+    `(only ${ev.edgeBuy.n.join(" and ")} players, so treat it as encouraging, not settled).`);
+  if (ev.tdLuckOnPoints) row("held", ev.tdLuckOnPoints.claim);
+  if (ev.tdLuckOnValue) row("failed", ev.tdLuckOnValue.claim +
+    " So use it to judge what a player will SCORE next season, not what the market will pay for him.");
+  if (ev.projection) row("modest", ev.projection.claim);
+  return box;
+}
+
 /* ---------- buy-low / sell-high board ---------- */
 function renderBoard(v) {
   const owner = new Map();
@@ -1116,15 +1206,17 @@ function renderBoard(v) {
   const card = el("div", "card");
   card.append(el("h2", null, buying ? "Buy low" : "Sell high"),
     el("div", "sub", buying
-      ? "Players whose usage says they are good, whose touchdown luck says last season lied, and whose price has not caught up. Touchdowns regress hardest of anything in football; snap share and targets carry over."
-      : "Players whose scoring outran their usage. The touchdowns are the least likely part of last season to repeat, so this is the window to move them."));
+      ? "Players whose usage says they are good, whose touchdown luck says last season lied, and whose price has not caught up."
+      : "Players whose scoring outran their usage. Those touchdowns are the least likely part of last season to repeat."));
+  card.append(evidenceNote());
   if (!top.length) { card.append(el("div", "empty", "Nothing clears the bar with this filter.")); v.append(card); return; }
 
   const tbl = el("table");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Held by</th><th class="num">Age</th>
     <th class="num">Usage</th><th>Tier</th><th class="num">Trend</th><th class="num">Pts/gm</th>
-    <th class="num">Adj</th><th class="num">TD luck</th><th class="num">Value</th>
-    <th class="num">Edge</th><th>Age curve</th></tr></thead>`;
+    <th class="num">Adj</th><th class="num">Proj</th><th class="num">TD luck</th>
+    <th class="num">Value</th><th class="num">Mkt gap</th><th class="num">Edge</th>
+    <th>Age curve</th></tr></thead>`;
   const tb = el("tbody");
   for (const r of top) {
     const p = pinfo(r.id);
@@ -1140,8 +1232,13 @@ function renderBoard(v) {
           : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
        <td class="num">${r.e.rawPpg ? r.e.rawPpg.toFixed(1) : "—"}</td>
        <td class="num">${r.e.ppg ? r.e.ppg.toFixed(1) : "—"}</td>
+       <td class="num">${(() => { const pj = projection(r.id); return pj
+          ? `<b>${pj.ppg.toFixed(1)}</b>` : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
        <td class="num"><span class="${r.l.cls === "buy" ? "edge-pos" : r.l.cls === "sell" ? "edge-neg" : ""}">${esc(r.l.txt)}</span></td>
        <td class="num">${fmt(val(r.id))}</td>
+       <td class="num">${(() => { const ms = marketSplit(r.id); return ms && ms.dir !== "agree"
+          ? `<span class="${ms.gap > 0 ? "edge-pos" : "edge-neg"}">${esc(ms.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">·</span>'; })()}</td>
        <td class="num">${edgeCell(r.id)}</td>
        <td>${(() => { const a = ageRead(r.id); return a ? `<span class="tag ${a.cls}">${esc(a.txt)}</span>` : ""; })()}</td>`);
     const html = fullRead(r.id, r.own && !r.own.mine
@@ -1377,6 +1474,7 @@ async function pickLeague(league) {
     await loadValues();
     setStatus("Loading production and usage…");
     await loadSignals();
+    calibrateMarkets();
     try { await loadStats(); } catch { S.stats = {}; S.prodSeason = null; }
     computeEdges();
 
