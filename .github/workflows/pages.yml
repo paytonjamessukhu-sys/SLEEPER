@@ -30,6 +30,11 @@ jobs:
         run: |
           mkdir -p /tmp/site
           cp index.html /tmp/site/
+          # The baked nflverse signals must ship alongside the page. Without them
+          # the app silently falls back to raw Sleeper totals and the buy/sell
+          # board comes up empty, so treat a missing data dir as a build failure.
+          test -f data/signals.json
+          cp -r data /tmp/site/
           touch /tmp/site/.nojekyll
           cd /tmp/site
           git init -b gh-pages
