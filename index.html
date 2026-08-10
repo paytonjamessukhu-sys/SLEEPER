@@ -272,6 +272,7 @@ footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
   <nav class="tabs hidden" id="tabs">
     <button data-tab="power" class="on">Power Rankings</button>
     <button data-tab="rosters">Rosters</button>
+    <button data-tab="board">Buy / Sell Board</button>
     <button data-tab="trade">Trade Calculator</button>
     <button data-tab="freeagents">Free Agents</button>
     <button data-tab="standings">Standings</button>
@@ -306,6 +307,7 @@ const S = {
   username:null, user:null, season:null, seasonType:null, leagues:[], league:null,
   rosters:[], lusers:[], players:{}, values:{}, picks:[],
   stats:{}, prodSeason:null, edges:{}, faPos:"ALL", faSort:"edge",
+  sig:{}, sigMeta:null, boardPos:"ALL", boardSide:"buy",
   mode:"dynasty", source:null, myRosterId:null, tab:"power",
   trade:{ a:[], b:[] },
 };
@@ -452,6 +454,18 @@ async function loadStatsFor(season) {
   lsSet(key, trim);
   return trim;
 }
+/* Opportunity data, baked from nflverse and served beside this file. Browsers
+   cannot fetch nflverse directly (its releases send no CORS headers), so the
+   join happens offline and lands here as a same-origin file. It is a dated
+   snapshot, not a live feed — the UI says so rather than implying otherwise. */
+async function loadSignals() {
+  try {
+    const blob = await getJSON("./data/signals.json", 15000);
+    if (blob && blob.players) { S.sig = blob.players; S.sigMeta = blob.meta || null; return; }
+  } catch {}
+  S.sig = {}; S.sigMeta = null;
+}
+
 async function loadStats() {
   // Preseason has no games yet, so last completed season is the honest baseline.
   // Once the year is underway we prefer live data, but only after enough of the
@@ -488,18 +502,40 @@ const FULL_GP = 14;          // games needed before a sample carries full weight
 const AGE_BANDS = [[24,"≤24"], [27,"25–27"], [30,"28–30"], [99,"31+"]];
 const ageBand = (a) => a == null ? "?" : (AGE_BANDS.find(b => a <= b[0]) || AGE_BANDS[3])[1];
 
+/* What a player is owed by his usage, regardless of whether the ball bounced in.
+   Touchdowns are the least stable thing in football and opportunity is the most,
+   so the two are kept apart: `ppg` is what he scored, `xppg` is what that same
+   season looks like with lucky and unlucky touchdowns taken back out. */
+function production(id) {
+  const sg = S.sig?.[id];
+  const yr = S.sigMeta?.latest;
+  const s = sg && yr ? sg.s?.[yr] : null;
+  if (s) return { ppg: s.ppg, xppg: s.xppg, gp: s.g, tdLuck: (s.td ?? 0) - (s.xtd ?? 0),
+    wopr: s.wopr ?? null, ts: s.ts ?? null, snap: s.snp ?? null,
+    tgt: s.tgt ?? 0, car: s.car ?? 0, draft: sg.d || null, src: "nflverse" };
+  // Fallback to Sleeper's own season totals if the baked file is missing. No
+  // opportunity data there, so luck cannot be separated — say so, don't fake it.
+  const st = S.stats[id], k = statKey(), gp = st?.gp || 0;
+  if (gp > 0) { const ppg = (st[k] ?? st.ppr ?? 0) / gp;
+    return { ppg, xppg: ppg, gp, tdLuck: null, wopr: null, ts: null, snap: null,
+      tgt: 0, car: 0, draft: null, src: "sleeper" }; }
+  return null;
+}
+
 function computeEdges() {
-  const k = statKey(), dyn = S.mode === "dynasty";
+  const dyn = S.mode === "dynasty";
   S.edges = {};
   const cohorts = {};
   for (const [id, e] of Object.entries(S.values)) {
     const p = pinfo(id), pos = e.pos || p.p;
     if (!GROUPS.includes(pos)) continue;   // QB/RB/WR/TE — K and DEF markets are noise
-    const st = S.stats[id];
-    const gp = st?.gp || 0;
-    const ppg = gp > 0 ? (st[k] ?? st.ppr ?? 0) / gp : 0;
+    const pr = production(id);
     const band = dyn ? ageBand(p.a) : "all";
-    const rec = { id, v: e.v, ppg, gp, pos, band };
+    // Rank on luck-adjusted points. Ranking on raw points prices a player's
+    // touchdown variance as if it were skill, which is how a fully healthy
+    // Justin Jefferson reads as the most overpriced man in the league.
+    const rec = { id, v: e.v, ppg: pr?.xppg ?? 0, rawPpg: pr?.ppg ?? 0,
+      gp: pr?.gp ?? 0, pos, band, pr };
     (cohorts[`${pos}|${band}`] ||= []).push(rec);
   }
   for (const [key, rows] of Object.entries(cohorts)) {
@@ -514,16 +550,22 @@ function computeEdges() {
       // Shrink toward zero on thin samples: eight games should not shout as loudly
       // as a full season. Straight-line confidence, easy to explain and to audit.
       const conf = Math.min(1, r.gp / FULL_GP);
-      S.edges[r.id] = { pos, band, ppg: r.ppg, gp: r.gp, conf,
+      S.edges[r.id] = { pos, band, ppg: r.ppg, rawPpg: r.rawPpg, gp: r.gp, conf,
         prodRank: i+1, priceRank: priceRank.get(r.id), implied,
-        rawEdge: implied - r.v, edge: Math.round((implied - r.v) * conf), cohort: q.length };
+        rawEdge: implied - r.v, edge: Math.round((implied - r.v) * conf), cohort: q.length,
+        tdLuck: r.pr?.tdLuck ?? null, wopr: r.pr?.wopr ?? null, ts: r.pr?.ts ?? null,
+        snap: r.pr?.snap ?? null, tgt: r.pr?.tgt ?? 0, car: r.pr?.car ?? 0,
+        draft: r.pr?.draft ?? null, src: r.pr?.src ?? null };
     });
     // Everyone else still gets a record, so the UI can say "not graded" and why,
     // rather than silently dropping rookies and injured players as if judged.
     for (const r of rows) if (!S.edges[r.id])
-      S.edges[r.id] = { pos, band, ppg: r.ppg, gp: r.gp, conf: 0, prodRank: null,
-        priceRank: null, implied: null, rawEdge: null, edge: null,
-        cohort: q.length, smallCohort: small };
+      S.edges[r.id] = { pos, band, ppg: r.ppg, rawPpg: r.rawPpg, gp: r.gp, conf: 0,
+        prodRank: null, priceRank: null, implied: null, rawEdge: null, edge: null,
+        cohort: q.length, smallCohort: small,
+        tdLuck: r.pr?.tdLuck ?? null, wopr: r.pr?.wopr ?? null, ts: r.pr?.ts ?? null,
+        snap: r.pr?.snap ?? null, tgt: r.pr?.tgt ?? 0, car: r.pr?.car ?? 0,
+        draft: r.pr?.draft ?? null, src: r.pr?.src ?? null };
   }
 }
 
@@ -563,6 +605,62 @@ function edgeTag(id) {
       `and one down season rarely overturns it. Worth watching, not dumping.${sample}` };
   return { cls:"sell", txt:"SELL", why:`${line}` +
     (tr > 0 ? " — and the market is still climbing, so the window to move him is open." : ".") + sample };
+}
+/* Opportunity, graded on the scale that fits the position. WOPR blends target
+   share with air-yards share and is the best single usage number for a pass
+   catcher; backs live on touches with snap share as the gate. */
+function opportunity(id) {
+  const e = S.edges[id]; if (!e) return null;
+  const pos = e.pos;
+  if (pos === "WR" || pos === "TE") {
+    if (e.wopr == null) return null;
+    const w = e.wopr;
+    return { val: w, txt: w.toFixed(2), lab: "WOPR",
+      tier: w >= 0.70 ? "elite" : w >= 0.55 ? "strong" : w >= 0.35 ? "rotational" : "thin",
+      why: `${(e.ts*100 || 0).toFixed(0)}% target share` + (e.snap != null ? `, ${(e.snap*100).toFixed(0)}% of snaps` : "") };
+  }
+  if (pos === "RB") {
+    const touches = (e.car || 0) + (e.tgt || 0);
+    if (!touches) return null;
+    return { val: touches / 25, txt: touches.toFixed(1), lab: "touch/gm",
+      tier: touches >= 18 ? "elite" : touches >= 13 ? "strong" : touches >= 8 ? "rotational" : "thin",
+      why: `${(e.car||0).toFixed(1)} carries + ${(e.tgt||0).toFixed(1)} targets a game` +
+        (e.snap != null ? `, ${(e.snap*100).toFixed(0)}% of snaps` : "") };
+  }
+  if (pos === "QB") {
+    if (e.snap == null) return null;
+    return { val: e.snap, txt: (e.snap*100).toFixed(0) + "%", lab: "snaps",
+      tier: e.snap >= 0.90 ? "elite" : e.snap >= 0.6 ? "strong" : "rotational",
+      why: "share of his offense's snaps" };
+  }
+  return null;
+}
+
+/* Touchdowns regress harder than anything else a player does, which makes the
+   gap between scored and expected the most reliable mispricing signal there is.
+   Negative luck on heavy usage is the buy; positive luck on light usage is the sell. */
+function luckRead(id) {
+  const e = S.edges[id];
+  if (!e || e.tdLuck == null) return null;
+  const l = e.tdLuck;
+  if (l <= -2) return { cls:"buy", txt:`${l.toFixed(1)} TD`, dir:"unlucky",
+    why:`Scored ${Math.abs(l).toFixed(1)} fewer touchdowns than his volume implied. Touchdowns regress; the usage is what carries over.` };
+  if (l >= 2) return { cls:"sell", txt:`+${l.toFixed(1)} TD`, dir:"lucky",
+    why:`Scored ${l.toFixed(1)} more touchdowns than his volume implied. That part of last season is the least likely to repeat.` };
+  return { cls:"hold", txt: (l>0?"+":"") + l.toFixed(1) + " TD", dir:"neutral",
+    why:"Touchdowns landed about where his volume said they should." };
+}
+
+/* The board score: usage he has earned, luck he has not, and a price that has
+   not caught up. Deliberately additive and inspectable rather than a fitted model —
+   every point of it can be read off the row it came from. */
+function boardScore(id) {
+  const e = S.edges[id]; if (!e || e.edge == null) return null;
+  const o = opportunity(id), l = e.tdLuck;
+  if (!o || l == null) return null;
+  const oppBoost = { elite: 1.0, strong: 0.6, rotational: 0.25, thin: 0 }[o.tier] ?? 0;
+  // Unlucky players score higher on the buy board, lucky ones on the sell board.
+  return e.edge + (-l * 220) + (oppBoost * 900);
 }
 const edgeCell = (id) => {
   const e = S.edges[id];
@@ -637,9 +735,9 @@ function render() {
   document.querySelectorAll("nav.tabs button").forEach(b =>
     b.classList.toggle("on", b.dataset.tab === S.tab));
   if (!S.league) return;
-  ({ power: renderPower, rosters: renderRosters, trade: renderTrade,
-     freeagents: renderFreeAgents, standings: renderStandings,
-     market: renderMarket }[S.tab])(v);
+  ({ power: renderPower, rosters: renderRosters, board: renderBoard,
+     trade: renderTrade, freeagents: renderFreeAgents,
+     standings: renderStandings, market: renderMarket }[S.tab])(v);
 }
 
 /* ---------- power rankings ---------- */
@@ -837,6 +935,108 @@ function tradeSide(side, label, pool) {
   const sum = S.trade[side].reduce((s,x) => s + x.v, 0);
   box.append(el("div", "total", sum ? fmt(sum) : ""));
   return box;
+}
+
+/* ---------- buy-low / sell-high board ---------- */
+function renderBoard(v) {
+  const owner = new Map();
+  for (const r of S.rosters) for (const id of (r.players || []))
+    if (id && id !== "0") owner.set(id, { name: teamName(r.roster_id), mine: r.roster_id === S.myRosterId });
+
+  const bar = el("div", "controls");
+  const seg = el("span", "seg");
+  [["buy","Buy low"], ["sell","Sell high"]].forEach(([k, lab]) => {
+    const b = el("button", S.boardSide === k ? "on" : null, lab);
+    b.addEventListener("click", () => { S.boardSide = k; render(); });
+    seg.append(b);
+  });
+  bar.append(seg, el("span", "head-spacer"));
+  ["ALL", ...GROUPS].forEach(g => {
+    const c = el("button", "chip" + (S.boardPos === g ? " on" : ""), g);
+    c.addEventListener("click", () => { S.boardPos = g; render(); });
+    bar.append(c);
+  });
+  v.append(bar);
+
+  const buying = S.boardSide === "buy";
+  const rows = [];
+  for (const id of Object.keys(S.edges)) {
+    const e = S.edges[id];
+    if (S.boardPos !== "ALL" && e.pos !== S.boardPos) continue;
+    const sc = boardScore(id);
+    if (sc == null) continue;
+    const o = opportunity(id), l = luckRead(id), own = owner.get(id);
+    if (buying) {
+      // Worth chasing only if the usage is real and the price has not caught up.
+      if (!["elite","strong"].includes(o.tier)) continue;
+      if (e.tdLuck >= 2) continue;                   // his scoring is inflated too
+      if (e.tdLuck > -0.5 && e.edge < 500) continue;
+      if (own?.mine) continue;                       // already yours
+    } else {
+      // Selling high needs an actual high. A player who was touchdown-UNLUCKY has
+      // no inflated price to cash in — listing him here is advice to sell a trough.
+      if (e.tdLuck < 1) continue;
+      if (e.edge > -500 && e.tdLuck < 4) continue;   // priced fairly and only mildly lucky
+      if (val(id) < 1000) continue;                  // not worth marketing
+    }
+    rows.push({ id, e, o, l, own, sc, name: S.values[id]?.name || pinfo(id).n });
+  }
+  rows.sort((a,b) => buying ? b.sc - a.sc : a.sc - b.sc);
+  const top = rows.slice(0, 24);
+
+  const meta = S.sigMeta;
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile(buying ? "Buy-low candidates" : "Sell-high candidates", fmt(rows.length),
+      buying ? "real usage, unlucky, underpriced" : "luck-inflated or overpriced"),
+    statTile("On other rosters", fmt(top.filter(r => r.own && !r.own.mine).length),
+      "trade targets, not waiver adds"),
+    statTile("Usage data", meta ? esc(meta.latest) + " season" : "unavailable",
+      meta ? "nflverse snapshot · " + esc(meta.built) : "baked file not found"));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, buying ? "Buy low" : "Sell high"),
+    el("div", "sub", buying
+      ? "Players whose usage says they are good, whose touchdown luck says last season lied, and whose price has not caught up. Touchdowns regress hardest of anything in football; snap share and targets carry over."
+      : "Players whose scoring outran their usage. The touchdowns are the least likely part of last season to repeat, so this is the window to move them."));
+  if (!top.length) { card.append(el("div", "empty", "Nothing clears the bar with this filter.")); v.append(card); return; }
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Held by</th><th class="num">Age</th>
+    <th class="num">Usage</th><th>Tier</th><th class="num">Pts/gm</th><th class="num">Adj</th>
+    <th class="num">TD luck</th><th class="num">Value</th><th class="num">Edge</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const r of top) {
+    const p = pinfo(r.id);
+    const tierCls = { elite:"diamond", strong:"buy", rotational:"hold", thin:"nosample" }[r.o.tier];
+    const row = el("tr", r.own?.mine ? "me" : null,
+      `<td>${esc(r.name)} <span class="posbadge">${esc(r.e.pos)}</span></td>
+       <td>${r.own ? esc(r.own.name) + (r.own.mine ? " (you)" : "") : '<span style="color:var(--ink-muted)">free agent</span>'}</td>
+       <td class="num">${p.a ?? "—"}</td>
+       <td class="num">${esc(r.o.txt)} <span style="color:var(--ink-muted);font-size:11px">${esc(r.o.lab)}</span></td>
+       <td><span class="tag ${tierCls}">${esc(r.o.tier.toUpperCase())}</span></td>
+       <td class="num">${r.e.rawPpg ? r.e.rawPpg.toFixed(1) : "—"}</td>
+       <td class="num">${r.e.ppg ? r.e.ppg.toFixed(1) : "—"}</td>
+       <td class="num"><span class="${r.l.cls === "buy" ? "edge-pos" : r.l.cls === "sell" ? "edge-neg" : ""}">${esc(r.l.txt)}</span></td>
+       <td class="num">${fmt(val(r.id))}</td>
+       <td class="num">${edgeCell(r.id)}</td>`);
+    const html = `<div class="tt-title">${esc(r.name)} — why he is here</div>` +
+      `<div class="tt-row"><span>${esc(r.o.why)}</span></div>` +
+      `<div class="tt-row"><span>${esc(r.l.why)}</span></div>` +
+      `<div class="tt-row"><span>${esc(edgeTag(r.id).why)}</span></div>` +
+      (r.own && !r.own.mine ? `<div class="tt-row"><span>Held by ${esc(r.own.name)} — this is a trade, not an add.</span></div>` : "");
+    row.addEventListener("mousemove", ev => showTT(html, ev));
+    row.addEventListener("mouseleave", hideTT);
+    row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(row);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub",
+    `Pts/gm is what he scored; Adj is the same season with lucky and unlucky touchdowns taken back out. ` +
+    `Hover or tap any row for the full reasoning. Usage from ${meta ? esc(meta.latest) : "—"}; ` +
+    `this is a snapshot, not a live feed.`));
+  v.append(card);
 }
 
 /* ---------- free agents ---------- */
@@ -1052,7 +1252,8 @@ async function pickLeague(league) {
     await loadPlayers();
     setStatus("Loading trade values…");
     await loadValues();
-    setStatus("Loading production history…");
+    setStatus("Loading production and usage…");
+    await loadSignals();
     try { await loadStats(); } catch { S.stats = {}; S.prodSeason = null; }
     computeEdges();
 
