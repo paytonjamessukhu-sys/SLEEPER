@@ -7,18 +7,18 @@ username **PaySuk34**. Two things live here:
 1. **`index.html` — Warchest**, a single-file web app (no server, no build step)
 2. **`sleeper_client.py`**, a zero-dependency Python client + CLI (stdlib only, Python 3.10+)
 
-**Live:** https://paytonjamessukhu-sys.github.io/sleeper/
+**Live:** https://paytonjamessukhu-sys.github.io/SLEEPER/
 
 ## Deploying
 
 Both deploy targets auto-deploy on every push to `main` — push an update,
 the live site picks it up with no further action.
 
-- **GitHub Pages** — `.github/workflows/pages.yml` builds and deploys on
-  every push. One-time setup per repo: **Settings → Pages → Source →
-  GitHub Actions** (GitHub requires a human, not a workflow, to flip this
-  the first time — it's the guardrail that stops a workflow from silently
-  turning a repo into a public site). After that it's fully automatic.
+- **GitHub Pages** — the site serves from the `gh-pages` branch, which GitHub
+  auto-enabled when the branch first appeared (no settings toggle was needed).
+  `.github/workflows/pages.yml` regenerates that branch from `index.html` on
+  every push to `main`, so deploys are fully automatic. `gh-pages` is a build
+  artifact — never commit to it by hand.
 - **Render** — `render.yaml` is a [Blueprint](https://render.com/docs/blueprint-spec)
   for a static-site service with `autoDeploy: true`. One-time setup:
   Render dashboard → **New + → Blueprint** (or **New + → Static Site**,

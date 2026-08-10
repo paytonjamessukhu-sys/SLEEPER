@@ -1,4 +1,11 @@
-name: Deploy Warchest to GitHub Pages
+name: Publish Warchest
+
+# Pages serves this repo from the gh-pages branch (auto-enabled when that
+# branch first appeared — no settings toggle involved). This workflow keeps
+# that branch in sync: every push to main rebuilds gh-pages from the current
+# index.html, and GitHub's internal "pages build and deployment" picks it up.
+# The branch is force-pushed as a single fresh commit each time on purpose:
+# it is a build artifact, not history.
 
 on:
   push:
@@ -6,39 +13,28 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: publish-pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Configure Pages (enables Pages on first run)
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Stage site
+      - name: Push site to gh-pages
         run: |
-          mkdir -p _site
-          cp index.html _site/index.html
-
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          mkdir -p /tmp/site
+          cp index.html /tmp/site/
+          touch /tmp/site/.nojekyll
+          cd /tmp/site
+          git init -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish site from ${GITHUB_SHA::7}"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
