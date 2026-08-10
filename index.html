@@ -137,6 +137,18 @@ tr.me td { background: var(--accent-soft); }
 .posbadge { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px;
   color: var(--ink-2); border: 1px solid var(--baseline); }
 
+/* ---------- edge tags ---------- */
+.tag { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 6px;
+  letter-spacing: .03em; white-space: nowrap; }
+.tag.diamond { color: #fff; background: var(--s3); border: 1px solid var(--s3); }
+.tag.buy { color: var(--up); border: 1px solid var(--up); }
+.tag.rental { color: var(--s4); border: 1px solid var(--s4); }
+.tag.sell { color: var(--down); border: 1px solid var(--down); }
+.tag.hold { color: var(--ink-muted); border: 1px solid var(--baseline); }
+.tag.nosample { color: var(--ink-muted); border: 1px dashed var(--baseline); }
+.edge-pos { color: var(--up); font-weight: 600; }
+.edge-neg { color: var(--down); font-weight: 600; }
+
 /* ---------- trade calculator ---------- */
 .tside { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); }
 .tside h3 { font-size: 13px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -261,6 +273,7 @@ footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
     <button data-tab="power" class="on">Power Rankings</button>
     <button data-tab="rosters">Rosters</button>
     <button data-tab="trade">Trade Calculator</button>
+    <button data-tab="freeagents">Free Agents</button>
     <button data-tab="standings">Standings</button>
     <button data-tab="market">Market</button>
   </nav>
@@ -290,11 +303,15 @@ const GROUPS = ["QB","RB","WR","TE"];
 const GROUP_VARS = { QB:"--s1", RB:"--s2", WR:"--s3", TE:"--s4" };
 
 const S = {
-  username:null, user:null, season:null, leagues:[], league:null,
+  username:null, user:null, season:null, seasonType:null, leagues:[], league:null,
   rosters:[], lusers:[], players:{}, values:{}, picks:[],
+  stats:{}, prodSeason:null, edges:{}, faPos:"ALL", faSort:"edge",
   mode:"dynasty", source:null, myRosterId:null, tab:"power",
   trade:{ a:[], b:[] },
 };
+/* A player needs this many games before production is treated as signal rather
+   than noise — a 2-game hot streak should never rank as a positional WR1. */
+const MIN_GP = 6;
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, html) => { const n=document.createElement(tag);
   if(cls) n.className=cls; if(html!=null) n.innerHTML=html; return n; };
@@ -312,6 +329,7 @@ function demoRoute(url) {
   const p = url.slice(SLEEPER.length);
   if (p === "/state/nfl") return DEMO.state;
   if (p === "/players/nfl") return DEMO.players;
+  if (p.startsWith("/stats/nfl/")) return DEMO.stats || {};
   if (p.includes("/trending/add")) return DEMO.trendingAdd;
   if (p.includes("/trending/drop")) return DEMO.trendingDrop;
   if (p.includes("/leagues/nfl/")) return p.endsWith(`/${DEMO.season}`) ? DEMO.leagues : [];
@@ -413,6 +431,146 @@ async function loadValues() {
 }
 const val = (id) => S.values[id]?.v || 0;
 
+/* =============================== production =============================== */
+/* Layer 1 of the front office: what a player actually SCORED, versus what the
+   market CHARGES for him. The gap between those two is the whole edge. */
+
+async function loadStatsFor(season) {
+  const key = `wc_stats_${season}`;
+  const cached = lsGet(key, 12*3600*1000);
+  if (cached) return cached;
+  const raw = await getJSON(`${SLEEPER}/stats/nfl/regular/${season}`) || {};
+  const trim = {};
+  for (const [id, s] of Object.entries(raw)) {
+    // Team defenses key as TEAM_XX here but as XX everywhere else; skip — the
+    // DEF market is too thin to grade and would only add join bugs.
+    if (!s || id.startsWith("TEAM_") || !(s.gp > 0)) continue;
+    const ppr = s.pts_ppr || 0;
+    if (ppr <= 0) continue;
+    trim[id] = { ppr, half: s.pts_half_ppr ?? ppr, std: s.pts_std ?? ppr, gp: s.gp };
+  }
+  lsSet(key, trim);
+  return trim;
+}
+async function loadStats() {
+  // Preseason has no games yet, so last completed season is the honest baseline.
+  // Once the year is underway we prefer live data, but only after enough of the
+  // league has actually played — otherwise week 1 would grade everyone off one game.
+  const cur = String(S.season), prev = String(Number(S.season) - 1);
+  let season = cur, stats = {};
+  if (S.seasonType && S.seasonType !== "pre") {
+    stats = await loadStatsFor(cur);
+    const deep = Object.values(stats).filter(s => s.gp >= MIN_GP).length;
+    if (deep < 50) { season = prev; stats = await loadStatsFor(prev); }
+  } else {
+    stats = await loadStatsFor(prev);
+    season = prev;
+  }
+  S.stats = stats || {};
+  S.prodSeason = season;
+}
+
+/* Which Sleeper scoring column matches this league's reception settings. */
+function statKey() {
+  const ppr = leagueFormat().ppr;
+  return ppr >= 1 ? "ppr" : ppr >= 0.5 ? "half" : "std";
+}
+
+/* Compare a player only against his own peer group, then ask: at his PRODUCTION
+   rank inside that group, what does the market normally charge? The gap between
+   that implied price and his real price is the edge.
+
+   The peer group is position + age band in dynasty, because a dynasty price is a
+   bet on future seasons — a 33-year-old outscoring his price is the age discount
+   working as intended, not a bargain. Redraft buys one season only, so there age
+   is irrelevant and the cohort is the whole position. */
+const FULL_GP = 14;          // games needed before a sample carries full weight
+const AGE_BANDS = [[24,"≤24"], [27,"25–27"], [30,"28–30"], [99,"31+"]];
+const ageBand = (a) => a == null ? "?" : (AGE_BANDS.find(b => a <= b[0]) || AGE_BANDS[3])[1];
+
+function computeEdges() {
+  const k = statKey(), dyn = S.mode === "dynasty";
+  S.edges = {};
+  const cohorts = {};
+  for (const [id, e] of Object.entries(S.values)) {
+    const p = pinfo(id), pos = e.pos || p.p;
+    if (!GROUPS.includes(pos)) continue;   // QB/RB/WR/TE — K and DEF markets are noise
+    const st = S.stats[id];
+    const gp = st?.gp || 0;
+    const ppg = gp > 0 ? (st[k] ?? st.ppr ?? 0) / gp : 0;
+    const band = dyn ? ageBand(p.a) : "all";
+    const rec = { id, v: e.v, ppg, gp, pos, band };
+    (cohorts[`${pos}|${band}`] ||= []).push(rec);
+  }
+  for (const [key, rows] of Object.entries(cohorts)) {
+    const [pos, band] = key.split("|");
+    const q = rows.filter(r => r.gp >= MIN_GP && r.ppg > 0 && r.v > 0);
+    const small = q.length < 5;   // too few peers for a price ladder to mean anything
+    const byPrice = [...q].sort((a,b) => b.v - a.v);
+    const curve = byPrice.map(r => r.v);                       // the price ladder
+    const priceRank = new Map(byPrice.map((r,i) => [r.id, i+1]));
+    if (!small) [...q].sort((a,b) => b.ppg - a.ppg).forEach((r, i) => {
+      const implied = curve[i] ?? 0;
+      // Shrink toward zero on thin samples: eight games should not shout as loudly
+      // as a full season. Straight-line confidence, easy to explain and to audit.
+      const conf = Math.min(1, r.gp / FULL_GP);
+      S.edges[r.id] = { pos, band, ppg: r.ppg, gp: r.gp, conf,
+        prodRank: i+1, priceRank: priceRank.get(r.id), implied,
+        rawEdge: implied - r.v, edge: Math.round((implied - r.v) * conf), cohort: q.length };
+    });
+    // Everyone else still gets a record, so the UI can say "not graded" and why,
+    // rather than silently dropping rookies and injured players as if judged.
+    for (const r of rows) if (!S.edges[r.id])
+      S.edges[r.id] = { pos, band, ppg: r.ppg, gp: r.gp, conf: 0, prodRank: null,
+        priceRank: null, implied: null, rawEdge: null, edge: null,
+        cohort: q.length, smallCohort: small };
+  }
+}
+
+/* A verdict, not a black box: every tag is a plain rule you can read off the row.
+   Deliberately conservative — the engine's job is to raise questions worth asking,
+   not to hand down judgements it cannot support. */
+function edgeTag(id) {
+  const e = S.edges[id];
+  if (!e) return { cls:"nosample", txt:"—", why:"Not in the graded pool." };
+  if (e.edge == null) return { cls:"nosample", txt:"NOT GRADED",
+    why: e.smallCohort ? `Too few ${e.pos}s his age to build a fair comparison.`
+       : e.gp ? `Only ${e.gp} game${e.gp === 1 ? "" : "s"} played — too thin to grade.`
+       : "No games in the baseline season, so there is nothing to price against — rookies and full-season injuries land here." };
+  const age = pinfo(id).a, tr = S.values[id]?.tr || 0, v = val(id);
+  // Both floors matter. The implied floor keeps deep-bench noise out; the floor on
+  // his ACTUAL price keeps out players the market has written off entirely — a man
+  // valued at 70 who out-ranks a thin rookie cohort is not a diamond, he is a rounding error.
+  const material = v >= 500 && e.implied >= 1000;
+  const sample = e.gp < FULL_GP ? ` (${e.gp}-game sample, so the number is damped)` : "";
+  const line = `Produces like ${e.pos}${e.prodRank} of ${e.cohort} in the ${e.band} group, priced like ${e.pos}${e.priceRank}`;
+  if (!material || Math.abs(e.edge) < 500)
+    return { cls:"hold", txt:"HOLD", why: material ? "Price and production roughly agree."
+      : "Too lightly valued to trade on — the comparison is not meaningful this far down the board." };
+  if (e.edge > 0) {
+    if (S.mode === "dynasty" && age && age <= 24)
+      return { cls:"diamond", txt:"DIAMOND", why:`${line}, and he is only ${age}.${sample}` };
+    if (S.mode === "dynasty" && age && age >= 29)
+      return { cls:"rental", txt:"RENTAL", why:`${line}, but he is ${age} — a win-now rental, not a foundation piece.${sample}` };
+    return { cls:"buy", txt:"BUY", why:`${line}.${sample}` };
+  }
+  // An elite price is the market's multi-year conviction. One weak season is not
+  // enough to overturn it, so flag the disagreement without calling it a sell.
+  // Scaled to cohort size — a fixed cut-off would make every player in a small
+  // group untouchable and no player in a large one protected.
+  if (e.priceRank <= Math.max(5, Math.ceil(e.cohort * 0.25)))
+    return { cls:"hold", txt:"WATCH", why:`${line} — but an elite price reflects years of evidence, ` +
+      `and one down season rarely overturns it. Worth watching, not dumping.${sample}` };
+  return { cls:"sell", txt:"SELL", why:`${line}` +
+    (tr > 0 ? " — and the market is still climbing, so the window to move him is open." : ".") + sample };
+}
+const edgeCell = (id) => {
+  const e = S.edges[id];
+  if (!e || e.edge == null) return '<span style="color:var(--ink-muted)">—</span>';
+  const s = e.edge > 0 ? "+" : "";
+  return `<span class="${e.edge > 0 ? "edge-pos" : e.edge < 0 ? "edge-neg" : ""}">${s}${fmt(e.edge)}</span>`;
+};
+
 /* =============================== derived =============================== */
 function teamName(rid) {
   const roster = S.rosters.find(r => r.roster_id === rid);
@@ -480,7 +638,8 @@ function render() {
     b.classList.toggle("on", b.dataset.tab === S.tab));
   if (!S.league) return;
   ({ power: renderPower, rosters: renderRosters, trade: renderTrade,
-     standings: renderStandings, market: renderMarket }[S.tab])(v);
+     freeagents: renderFreeAgents, standings: renderStandings,
+     market: renderMarket }[S.tab])(v);
 }
 
 /* ---------- power rankings ---------- */
@@ -564,24 +723,36 @@ function renderRosters(v) {
   const maxV = Math.max(...t.assets.map(a => a.v), 1);
   const tbl = el("table", "posgroup");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
-    <th class="num">Pos rk</th><th style="width:38%">Value</th><th class="num">30d</th></tr></thead>`;
+    <th class="num">Pos rk</th><th style="width:28%">Value</th><th class="num">Pts/gm</th>
+    <th class="num">Edge</th><th class="num">30d</th><th>Read</th></tr></thead>`;
   const tb = el("tbody");
   for (const g of [...GROUPS, "OTH"]) {
     const rows = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "OTH") === g);
     if (!rows.length) continue;
-    tb.append(el("tr", null, `<td class="gh" colspan="6">${g === "OTH" ? "Other" : g}</td>`));
+    tb.append(el("tr", null, `<td class="gh" colspan="9">${g === "OTH" ? "Other" : g}</td>`));
     for (const a of rows) {
       const p = pinfo(a.id), fcv = S.values[a.id];
+      const e = S.edges[a.id], tag = edgeTag(a.id);
       const tr30 = fcv?.tr || 0;
       const trTxt = !tr30 ? '<span style="color:var(--ink-muted)">·</span>'
         : `<span class="${tr30 > 0 ? "delta-up" : "delta-down"}">${tr30 > 0 ? "▲" : "▼"} ${fmt(Math.abs(tr30))}</span>`;
-      tb.append(el("tr", null,
+      const row = el("tr", null,
         `<td>${esc(a.name)}${starterIds.has(a.id) ? ' <span class="posbadge">ST</span>' : ""}</td>
          <td>${esc(p.t || "FA")}</td><td class="num">${p.a ?? "—"}</td>
          <td class="num">${fcv?.pr ? esc((fcv.pos || p.p) + fcv.pr) : "—"}</td>
          <td><span class="meter"><span class="track"><span class="fill" style="width:${a.v/maxV*100}%"></span></span>
              <span class="mval">${a.v ? fmt(a.v) : "—"}</span></span></td>
-         <td class="num">${trTxt}</td>`));
+         <td class="num">${e?.ppg ? e.ppg.toFixed(1) : "—"}</td>
+         <td class="num">${GROUPS.includes(a.pos) ? edgeCell(a.id) : '<span style="color:var(--ink-muted)">—</span>'}</td>
+         <td class="num">${trTxt}</td>
+         <td>${GROUPS.includes(a.pos) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>` : ""}</td>`);
+      if (GROUPS.includes(a.pos)) {
+        const html = `<div class="tt-title">${esc(a.name)}</div><div class="tt-row"><span>${esc(tag.why)}</span></div>`;
+        row.addEventListener("mousemove", ev => showTT(html, ev));
+        row.addEventListener("mouseleave", hideTT);
+        row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+      }
+      tb.append(row);
     }
   }
   tbl.append(tb); card.append(tbl); v.append(card);
@@ -668,6 +839,98 @@ function tradeSide(side, label, pool) {
   return box;
 }
 
+/* ---------- free agents ---------- */
+function renderFreeAgents(v) {
+  const rostered = new Set();
+  for (const r of S.rosters) for (const id of (r.players || [])) if (id && id !== "0") rostered.add(id);
+
+  const pool = [];
+  for (const [id, e] of Object.entries(S.values)) {
+    if (rostered.has(id)) continue;
+    const p = pinfo(id), pos = e.pos || p.p;
+    if (!GROUPS.includes(pos)) continue;
+    pool.push({ id, name: e.name || p.n, pos, team: p.t, age: p.a,
+      v: e.v, tr: e.tr || 0, ed: S.edges[id] || null });
+  }
+
+  const bar = el("div", "controls");
+  ["ALL", ...GROUPS].forEach(g => {
+    const c = el("button", "chip" + (S.faPos === g ? " on" : ""), g);
+    c.addEventListener("click", () => { S.faPos = g; render(); });
+    bar.append(c);
+  });
+  bar.append(el("span", "head-spacer"));
+  const seg = el("span", "seg");
+  [["edge","Best edge"], ["value","Value"], ["ppg","Points/gm"], ["trend","Trending"]].forEach(([k, lab]) => {
+    const b = el("button", S.faSort === k ? "on" : null, lab);
+    b.addEventListener("click", () => { S.faSort = k; render(); });
+    seg.append(b);
+  });
+  bar.append(seg);
+  v.append(bar);
+
+  const shown = pool.filter(p => S.faPos === "ALL" || p.pos === S.faPos);
+  const sorters = {
+    edge:  (a,b) => (b.ed?.edge ?? -1e9) - (a.ed?.edge ?? -1e9),
+    value: (a,b) => b.v - a.v,
+    ppg:   (a,b) => (b.ed?.ppg || 0) - (a.ed?.ppg || 0),
+    trend: (a,b) => b.tr - a.tr,
+  };
+  shown.sort(sorters[S.faSort] || sorters.edge);
+  const rows = shown.slice(0, 60);
+
+  const gems = shown.filter(p => ["diamond","buy"].includes(edgeTag(p.id).cls)).length;
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Free agents graded", fmt(shown.filter(p => p.ed?.edge != null).length),
+      `${fmt(shown.length)} total available`),
+    statTile("Underpriced on the wire", fmt(gems), "produce above their market price"),
+    statTile("Production baseline", esc(S.prodSeason || "—"),
+      `${MIN_GP}+ games to be ranked`));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Free agents by edge"),
+    el("div", "sub", "Edge compares a player only against others at his position " +
+      (S.mode === "dynasty" ? "and in his age group" : "") +
+      ": what the market charges for his level of production, minus what it charges for him. " +
+      "Positive means he outscores his price. Thin samples are damped toward zero."));
+  if (!rows.length) { card.append(el("div", "empty", "No free agents match that filter.")); v.append(card); return; }
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
+    <th class="num">Pts/gm</th><th class="num">Gm</th><th class="num">Produces</th>
+    <th class="num">Priced</th><th class="num">Value</th><th class="num">Edge</th>
+    <th class="num">30d</th><th>Read</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const p of rows) {
+    const e = p.ed, tag = edgeTag(p.id);
+    const trTxt = !p.tr ? '<span style="color:var(--ink-muted)">·</span>'
+      : `<span class="${p.tr > 0 ? "delta-up" : "delta-down"}">${p.tr > 0 ? "▲" : "▼"} ${fmt(Math.abs(p.tr))}</span>`;
+    const tr = el("tr", null,
+      `<td>${esc(p.name)} <span class="posbadge">${esc(p.pos)}</span></td>
+       <td>${esc(p.team || "FA")}</td>
+       <td class="num">${p.age ?? "—"}</td>
+       <td class="num">${e?.ppg ? e.ppg.toFixed(1) : "—"}</td>
+       <td class="num">${e?.gp || "—"}</td>
+       <td class="num">${e?.prodRank ? esc(p.pos + e.prodRank) : "—"}</td>
+       <td class="num">${e?.priceRank ? esc(p.pos + e.priceRank) : "—"}</td>
+       <td class="num">${fmt(p.v)}</td>
+       <td class="num">${edgeCell(p.id)}</td>
+       <td class="num">${trTxt}</td>
+       <td><span class="tag ${tag.cls}">${esc(tag.txt)}</span></td>`);
+    const html = `<div class="tt-title">${esc(p.name)}</div><div class="tt-row"><span>${esc(tag.why)}</span></div>`;
+    tr.addEventListener("mousemove", ev => showTT(html, ev));
+    tr.addEventListener("mouseleave", hideTT);
+    tr.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(tr);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub", `Showing ${rows.length} of ${fmt(shown.length)} · ` +
+    `production from the ${esc(S.prodSeason || "—")} season · hover or tap a row for the reasoning`));
+  v.append(card);
+}
+
 /* ---------- standings ---------- */
 function renderStandings(v) {
   const card = el("div", "card");
@@ -746,6 +1009,7 @@ async function loadEverything(username) {
 
     setStatus("Finding your leagues…");
     const state = await sleeper("/state/nfl") || {};
+    S.seasonType = state.season_type || null;
     let season = String(state.league_season || state.season || new Date().getFullYear());
     let leagues = await sleeper(`/user/${user.user_id}/leagues/nfl/${season}`) || [];
     if (!leagues.length) {
@@ -788,6 +1052,9 @@ async function pickLeague(league) {
     await loadPlayers();
     setStatus("Loading trade values…");
     await loadValues();
+    setStatus("Loading production history…");
+    try { await loadStats(); } catch { S.stats = {}; S.prodSeason = null; }
+    computeEdges();
 
     const f = leagueFormat();
     $("#fmtPill").textContent =
@@ -819,7 +1086,9 @@ $("#modeSeg").querySelectorAll("button").forEach(b =>
     S.mode = b.dataset.mode;
     $("#modeSeg").querySelectorAll("button").forEach(x =>
       x.classList.toggle("on", x === b));
-    setStatus("Reloading values…"); await loadValues(); setStatus(null); render();
+    setStatus("Reloading values…"); await loadValues();
+    computeEdges();   // the price ladder moved, so every edge moves with it
+    setStatus(null); render();
   }));
 /* localStorage throws in some sandboxed embeddings — never let it break a click. */
 const remember = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
