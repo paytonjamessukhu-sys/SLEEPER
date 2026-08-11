@@ -1129,19 +1129,20 @@ function evidenceNote() {
   const box = el("div", "evidence");
   if (!ev) { box.append(el("div", "sub", "No backtest recorded in this data file.")); return box; }
   box.append(el("div", "ev-h", "What has been measured — and what has not"));
+  const LABEL = { held:["buy","HELD UP"], failed:["sell","DID NOT"], modest:["hold","MODEST"],
+                  unproven:["nosample","UNPROVEN"], suggestive:["hold","SUGGESTIVE"] };
   const row = (state, txt) => {
+    const [cls, txt2] = LABEL[state] || LABEL.modest;
     const d = el("div", "ev-row");
-    d.append(el("span", `tag ${state === "held" ? "buy" : state === "failed" ? "sell" : "hold"}`,
-      state === "held" ? "HELD UP" : state === "failed" ? "DID NOT" : "MODEST"),
-      el("span", null, esc(txt)));
+    d.append(el("span", `tag ${cls}`, txt2), el("span", null, esc(txt)));
     box.append(d);
   };
-  if (ev.edgeBuy) row("held", `${ev.edgeBuy.claim} Beat them by ${ev.edgeBuy.windows.map(w=>w+"%").join(" and ")} ` +
-    `(only ${ev.edgeBuy.n.join(" and ")} players, so treat it as encouraging, not settled).`);
+  if (ev.edgeBuy) row(ev.edgeBuy.verdict === "unproven" ? "unproven" : "held", ev.edgeBuy.claim);
   if (ev.tdLuckOnPoints) row("held", ev.tdLuckOnPoints.claim);
   if (ev.tdLuckOnValue) row("failed", ev.tdLuckOnValue.claim +
     " So use it to judge what a player will SCORE next season, not what the market will pay for him.");
   if (ev.projection) row("modest", ev.projection.claim);
+  if (ev.marketShape) row("suggestive", ev.marketShape.claim);
   return box;
 }
 

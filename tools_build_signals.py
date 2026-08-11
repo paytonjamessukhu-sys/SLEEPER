@@ -351,14 +351,29 @@ meta = {"built": __import__("datetime").date.today().isoformat(),
         # history, comparing each call to players of similar starting value.
         # Recorded here so the app can state what is evidenced and what is not.
         "evidence": {
-          "edgeBuy": {"windows": [15.6, 10.0], "n": [22, 23], "verdict": "consistent",
-            "claim": "Players tagged BUY beat similarly-priced peers in both windows tested."},
+          # Downgraded after a permutation court. The point estimates are real,
+          # but shuffling the labels showed chance reaches them often: p=0.072
+          # in the first window and p=0.412 in the second. Two windows agreeing
+          # in sign is two coin flips agreeing, and was never the test it was
+          # reported as.
+          "edgeBuy": {"windows": [15.6, 10.0], "n": [22, 23], "p": [0.072, 0.412],
+            "verdict": "unproven",
+            "claim": "Players tagged BUY beat similarly-priced peers by 15.6% and 10.0% — but a permutation test cannot separate that from chance (p=0.07 and p=0.41). Directionally encouraging, statistically unproven."},
           "tdLuckOnPoints": {"verdict": "strong",
             "claim": "Touchdown luck predicts next-season POINTS: lucky players fell 1.6-1.8 ppg, unlucky gained 0.3-0.6."},
           "tdLuckOnValue": {"windows": [-10.5, 20.8], "verdict": "inconsistent",
             "claim": "Touchdown luck did NOT reliably predict market VALUE — opposite signs in the two windows."},
           "projection": {"verdict": "modest",
-            "claim": "The projection cut prediction error 7-13% against reusing last season's points, held out of sample."}},
+            "claim": "The projection cut prediction error 7-13% against reusing last season's points, held out of sample."},
+          # Both markets fitted against positional rank with a power law, under a
+          # permutation court. The consensus curve came out steeper at every
+          # single position — a structural disagreement about how much elite
+          # players are worth relative to depth, not a scale artifact, since an
+          # exponent does not move when you rescale the values.
+          "marketShape": {"verdict": "suggestive",
+            "exponents": {"QB": [-1.243, -2.394], "RB": [-0.657, -1.607],
+                          "WR": [-0.559, -0.919], "TE": [-1.139, -2.350]},
+            "claim": "The expert-consensus market is steeper than the trade market at all four positions: it prices elite players far above depth, while trades clear closer to flat. Trading quantity for quality is therefore cheaper in trade terms than consensus thinks it should be. Neither curve fits a power law well except WR, so treat this as a direction, not a measurement."}},
         "td_rates": {f"{a}_{b}": round(v, 5) for (a, b), v in RATES.items()}}
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
