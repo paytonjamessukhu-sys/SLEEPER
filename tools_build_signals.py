@@ -126,14 +126,47 @@ draft_by_gsis, draft_by_name = {}, {}
 for r in fetch_csv(f"{REL}/draft_picks/draft_picks.csv"):
     if r.get("position") not in POS or not num(r.get("round")):
         continue
-    d = {"yr": int(num(r.get("season"))), "rd": int(num(r.get("round"))),
-         "pk": int(num(r.get("pick")))}
     gid = (r.get("gsis_id") or "").strip()
+    d = {"yr": int(num(r.get("season"))), "rd": int(num(r.get("round"))),
+         "pk": int(num(r.get("pick"))), "gid": gid or None}
     if gid:
         draft_by_gsis[gid] = d
     nm = norm(r.get("pfr_player_name"))
     if nm:
         draft_by_name[(nm, r["position"])] = d
+
+# ---------- depth charts (development candidates) ----------
+# Who a backup is directly behind, on his own NFL team, right now — the one
+# signal in this file that needs no fantasy production and no drafted roster
+# to mean something: dynasty value is partly a bet on a role a player doesn't
+# have yet, and a young man stuck behind an aging or declining starter is
+# exactly that bet. Sourced separately from the stats seasons: this wants the
+# CURRENT depth chart, whatever the actual calendar year is, not the latest
+# season with a completed line (`latest`, which trails by a year in the
+# preseason). Updated ~daily by ESPN via nflverse; only the most recent
+# snapshot in the file is used.
+TEAM_ALIAS = {"LA": "LAR"}   # ESPN's depth chart says LA; Sleeper and everyone else say LAR
+depth = {}   # gsis -> {team, rank}
+try:
+    rows = fetch_csv(f"{REL}/depth_charts/depth_charts_{cur}.csv")
+    latest_dt = max((r["dt"] for r in rows if r.get("dt")), default=None)
+    n = 0
+    for r in rows:
+        if r.get("dt") != latest_dt or r.get("pos_abb") not in POS:
+            continue
+        gid = (r.get("gsis_id") or "").strip()
+        if not gid or not (r.get("player_name") or "").strip():
+            continue
+        try:
+            rank = int(r.get("pos_rank"))
+        except (TypeError, ValueError):
+            continue
+        team = r.get("team")
+        depth[gid] = {"team": TEAM_ALIAS.get(team, team), "pos": r.get("pos_abb"), "rank": rank}
+        n += 1
+    log(f"  depth_charts {cur}: {n} skill players, snapshot {latest_dt}")
+except Exception as e:
+    log(f"  depth_charts {cur}: unavailable ({e})")
 
 # ---------- expected fantasy points (ffverse/ffopportunity) ----------
 # A per-play XGBoost model of what an average player scores given each
@@ -219,6 +252,8 @@ for gid, pos in pos_of.items():
     d = draft_by_gsis.get(gid) or draft_by_name.get((norm(name_of[gid]), pos))
     if d:
         rec["d"] = d
+    if gid in depth:
+        rec["dc"] = depth[gid]
     out[sid] = rec
 
 # ---------- rookies: drafted, no NFL snaps yet ----------
@@ -235,7 +270,10 @@ for (nm, pos), d in draft_by_name.items():
     sid = cands[0]
     if sid in out:                             # already has production
         continue
-    out[sid] = {"pos": pos, "s": {}, "d": d, "rookie": True}
+    rec = {"pos": pos, "s": {}, "d": d, "rookie": True}
+    if d.get("gid") and d["gid"] in depth:
+        rec["dc"] = depth[d["gid"]]
+    out[sid] = rec
     rookies += 1
 
 # ---------- a second market ----------

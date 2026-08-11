@@ -553,6 +553,46 @@ function production(id) {
   return null;
 }
 
+/* Who's the current starter at each NFL team+position, from ESPN's depth
+   chart (via nflverse, refreshed ~daily). This needs no fantasy roster at all
+   — it's the one signal in this app that works before either league drafts,
+   because it's asking about NFL teams, not fantasy ones. */
+function computeDepthIndex() {
+  S.starterAt = {};                        // "TEAM|POS" -> sleeper id of the rank-1 guy
+  for (const [id, sg] of Object.entries(S.sig || {})) {
+    const dc = sg.dc; if (!dc || dc.rank !== 1) continue;
+    S.starterAt[`${dc.team}|${dc.pos}`] = id;
+  }
+}
+
+/* The bet dynasty value partly is: a young player who doesn't have the role
+   yet, stuck behind a starter whose window is closing. Needs no production of
+   his own to mean something — that's the point, and why it's kept distinct
+   from Edge, which needs production to exist at all. */
+function successionRead(id) {
+  const dc = S.sig?.[id]?.dc;
+  if (!dc || dc.rank === 1 || dc.rank > 3) return null;   // already starting, or too buried to matter
+  const incId = S.starterAt[`${dc.team}|${dc.pos}`];
+  if (!incId || incId === id) return null;
+  const myAge = pinfo(id).a, incAge = pinfo(incId).a;
+  if (myAge == null || incAge == null) return null;
+  const myCurve = ageRead(id), incCurve = ageRead(incId);
+  const stillDeveloping = myCurve && myCurve.cls === "diamond";           // ascending, per the position curve
+  const incFading = (incCurve && ["hold","sell"].includes(incCurve.cls)) || (incAge - myAge >= 5);
+  if (!stillDeveloping || !incFading) return null;
+  // Filter out pure camp bodies: needs either real draft capital or some value
+  // already recognized by the market, or this is noise, not a real bet.
+  const d = draftRead(id);
+  if (!(d && d.strong) && val(id) < 200) return null;
+  const incName = S.values[incId]?.name || pinfo(incId).n;
+  return { cls: "diamond", txt: `${dc.pos}${dc.rank} BEHIND ${incAge}yo`,
+    incId, incName, myAge, incAge,
+    why: `${dc.pos}${dc.rank} on ${dc.team} behind ${incName} (${incAge}` +
+      (incCurve && incCurve.cls === "sell" ? `, past the ${dc.pos} peak window` :
+       incCurve && incCurve.cls === "hold" ? `, on the back half of his prime` : "") +
+      `). A real workload change is a roster move away, and the market isn't pricing for it yet.` };
+}
+
 function computeEdges() {
   const dyn = S.mode === "dynasty";
   S.edges = {};
@@ -862,7 +902,7 @@ function fullRead(id, extra) {
   const push = (s) => { if (s) parts.push(`<div class="tt-row"><span>${esc(s)}</span></div>`); };
   const o = opportunity(id), l = luckRead(id), t = usageTrend(id),
         a = ageRead(id), d = draftRead(id), ph = postHype(id),
-        pj = projection(id), ms = marketSplit(id);
+        pj = projection(id), ms = marketSplit(id), sc = successionRead(id);
   push(edgeTag(id).why);
   if (pj) push(pj.why);
   if (ms && ms.dir !== "agree") push(ms.why);
@@ -873,6 +913,7 @@ function fullRead(id, extra) {
   if (d && !S.edges[id]?.gp) push(null);            // already said in the tag
   else if (d && d.strong) push(d.why);
   if (ph) push(ph.why);
+  if (sc) push(sc.why);
   (extra || []).forEach(push);
   return `<div class="tt-title">${esc(name)}</div>` + parts.join("");
 }
@@ -1473,6 +1514,61 @@ function renderTradeFinder(v) {
   v.append(card);
 }
 
+/* ---------- development candidates ---------- */
+/* The one board that needs no fantasy roster at all — it reads NFL depth
+   charts, not fantasy ones, so it works before either league has drafted a
+   single pick. That's deliberate: this is the signal available right now. */
+function renderDevBoard(v, owner) {
+  const rows = [];
+  for (const id of Object.keys(S.sig || {})) {
+    if (S.boardPos !== "ALL" && S.sig[id].pos !== S.boardPos) continue;
+    const sc = successionRead(id);
+    if (!sc) continue;
+    rows.push({ id, sc, own: owner.get(id), name: S.values[id]?.name || pinfo(id).n });
+  }
+  // Youngest-behind-oldest first — the widest gap is the clearest bet.
+  rows.sort((a,b) => (b.sc.incAge - b.sc.myAge) - (a.sc.incAge - a.sc.myAge));
+
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Development candidates", fmt(rows.length), "young, behind a fading starter, still cheap"),
+    statTile("Depth charts as of", S.sigMeta?.built ? esc(S.sigMeta.built) : "—", "ESPN via nflverse, refreshed ~daily"),
+    statTile("Needs a fantasy roster?", "No", "this reads NFL depth charts, not your league"));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Development candidates"),
+    el("div", "sub", "Dynasty value is partly a bet on a role a player doesn't have yet. These are young " +
+      "players stuck behind a starter on the back half of his own age curve — the market can't price a role " +
+      "change that hasn't happened, so it's priced like it never will."));
+  if (!rows.length) { card.append(el("div", "empty", "No development candidates clear the bar with this filter.")); v.append(card); return; }
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Held by</th><th class="num">Age</th>
+    <th>Behind</th><th class="num">Incumbent age</th><th class="num">Value</th>
+    <th class="num">Draft capital</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const r of rows.slice(0, 30)) {
+    const d = draftRead(r.id);
+    const row = el("tr", r.own?.mine ? "me" : null,
+      `<td>${esc(r.name)} <span class="posbadge">${esc(S.sig[r.id].pos)}</span></td>
+       <td>${r.own ? esc(r.own.name) + (r.own.mine ? " (you)" : "") : '<span style="color:var(--ink-muted)">free agent</span>'}</td>
+       <td class="num">${r.sc.myAge}</td>
+       <td>${esc(r.sc.incName)}</td>
+       <td class="num">${r.sc.incAge}</td>
+       <td class="num">${fmt(val(r.id))}</td>
+       <td class="num">${d ? esc(d.txt) : '<span style="color:var(--ink-muted)">—</span>'}</td>`);
+    const html = fullRead(r.id);
+    row.addEventListener("mousemove", ev => showTT(html, ev));
+    row.addEventListener("mouseleave", hideTT);
+    row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(row);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub", `Showing ${Math.min(30, rows.length)} of ${rows.length} · hover or tap a row for the full reasoning.`));
+  v.append(card);
+}
+
 /* ---------- buy-low / sell-high board ---------- */
 function renderBoard(v) {
   const owner = new Map();
@@ -1481,7 +1577,7 @@ function renderBoard(v) {
 
   const bar = el("div", "controls");
   const seg = el("span", "seg");
-  [["buy","Buy low"], ["sell","Sell high"]].forEach(([k, lab]) => {
+  [["buy","Buy low"], ["sell","Sell high"], ["dev","Development"]].forEach(([k, lab]) => {
     const b = el("button", S.boardSide === k ? "on" : null, lab);
     b.addEventListener("click", () => { S.boardSide = k; render(); });
     seg.append(b);
@@ -1493,6 +1589,8 @@ function renderBoard(v) {
     bar.append(c);
   });
   v.append(bar);
+
+  if (S.boardSide === "dev") { renderDevBoard(v, owner); return; }
 
   const buying = S.boardSide === "buy";
   const rows = [];
@@ -1811,6 +1909,7 @@ async function pickLeague(league) {
     calibrateMarkets();
     try { await loadStats(); } catch { S.stats = {}; S.prodSeason = null; }
     computeEdges();
+    computeDepthIndex();
 
     const f = leagueFormat();
     $("#fmtPill").textContent =
