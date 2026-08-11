@@ -497,6 +497,16 @@ async function loadSignals() {
   S.sig = {}; S.sigMeta = null;
 }
 
+/* Value-path risk, baked from ~7 years of DynastyProcess weekly history by
+   tools_build_risk.py. Optional file — the app works without it. */
+async function loadRisk() {
+  try {
+    const blob = await getJSON("./data/risk.json", 15000, { cache: "no-cache" });
+    if (blob && blob.players) { S.risk = blob.players; S.riskMeta = blob.meta || null; return; }
+  } catch {}
+  S.risk = {}; S.riskMeta = null;
+}
+
 async function loadStats() {
   // Preseason has no games yet, so last completed season is the honest baseline.
   // Once the year is underway we prefer live data, but only after enough of the
@@ -894,6 +904,35 @@ function calibrateMarkets() {
   }
 }
 
+/* How turbulent this player's market value has actually been, against players
+   of his own position and price tier. Measured on share of the total market
+   (the value scale itself inflates), over the trailing ~2 years of weekly
+   DynastyProcess history. Survivorship makes every drawdown a floor: players
+   who crash out of the file stop reporting before the bottom. */
+function riskRead(id) {
+  const r = S.risk?.[id], meta = S.riskMeta;
+  if (!r || !meta?.arch) return null;
+  const tier = r.cur > 100 ? "elite" : r.cur > 10 ? "startable" : "tail";
+  const peer = meta.arch[`${r.pos}_${tier}`];
+  if (!peer) return null;
+  const ratio = peer.vol_med > 0 ? r.vol / peer.vol_med : 1;
+  const ratioD = peer.mdd_med > 0 ? r.mdd / peer.mdd_med : 1;
+  // Labels are RELATIVE to position-and-tier peers: the median startable player
+  // slides 70%+ inside two years, so an absolute threshold marks nearly the
+  // whole league FRAGILE and the chip stops meaning anything. One absolute
+  // floor survives: no 60%+ slide gets called steady, whatever his new
+  // neighbours look like — that's how a crashed Kelce briefly read STEADY.
+  const cls = (ratio >= 1.4 || ratioD >= 1.25) ? "sell"
+            : (ratio <= 0.7 && r.mdd < 0.6) ? "buy" : "hold";
+  const label = cls === "buy" ? "STEADY" : cls === "sell" ? "FRAGILE" : "TYPICAL";
+  const tierTxt = tier === "tail" ? "deep" : tier;
+  return { cls, txt: label, vol: r.vol, mdd: r.mdd, tier,
+    why: `Worst slide of the last two years: ${(r.mdd*100).toFixed(0)}% off its peak ` +
+      `(the median ${tierTxt} ${r.pos} slides ${(peer.mdd_med*100).toFixed(0)}%). Week-to-week his price is ` +
+      `${ratio <= 0.7 ? "notably calmer than" : ratio >= 1.4 ? `${ratio.toFixed(1)}× as turbulent as` : "about as turbulent as"} ` +
+      `his peers'. Players who crash out of the data entirely stop reporting, so every drawdown here is a floor, not a ceiling.` };
+}
+
 /* Everything the app knows about one player, as sentences. Assembled in one
    place so the board, the wire and the roster all explain themselves identically. */
 function fullRead(id, extra) {
@@ -902,7 +941,8 @@ function fullRead(id, extra) {
   const push = (s) => { if (s) parts.push(`<div class="tt-row"><span>${esc(s)}</span></div>`); };
   const o = opportunity(id), l = luckRead(id), t = usageTrend(id),
         a = ageRead(id), d = draftRead(id), ph = postHype(id),
-        pj = projection(id), ms = marketSplit(id), sc = successionRead(id);
+        pj = projection(id), ms = marketSplit(id), sc = successionRead(id),
+        rk = riskRead(id);
   push(edgeTag(id).why);
   if (pj) push(pj.why);
   if (ms && ms.dir !== "agree") push(ms.why);
@@ -914,6 +954,7 @@ function fullRead(id, extra) {
   else if (d && d.strong) push(d.why);
   if (ph) push(ph.why);
   if (sc) push(sc.why);
+  if (rk && rk.cls !== "hold") push(rk.why);
   (extra || []).forEach(push);
   return `<div class="tt-title">${esc(name)}</div>` + parts.join("");
 }
@@ -1228,14 +1269,14 @@ function renderRosters(v) {
   const maxV = Math.max(...t.assets.map(a => a.v), 1);
   const tbl = el("table", "posgroup");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
-    <th class="num">Pos rk</th><th style="width:22%">Value</th><th class="num">Pts/gm</th>
+    <th class="num">Pos rk</th><th style="width:20%">Value</th><th class="num">Pts/gm</th>
     <th class="num">Proj</th><th class="num">Mkt gap</th>
-    <th class="num">Edge</th><th class="num">30d</th><th>Read</th></tr></thead>`;
+    <th class="num">Edge</th><th class="num">30d</th><th>Risk</th><th>Read</th></tr></thead>`;
   const tb = el("tbody");
   for (const g of [...GROUPS, "OTH"]) {
     const rows = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "OTH") === g);
     if (!rows.length) continue;
-    tb.append(el("tr", null, `<td class="gh" colspan="11">${g === "OTH" ? "Other" : g}</td>`));
+    tb.append(el("tr", null, `<td class="gh" colspan="12">${g === "OTH" ? "Other" : g}</td>`));
     for (const a of rows) {
       const p = pinfo(a.id), fcv = S.values[a.id];
       const e = S.edges[a.id], tag = edgeTag(a.id);
@@ -1256,6 +1297,9 @@ function renderRosters(v) {
             : '<span style="color:var(--ink-muted)">·</span>'; })()}</td>
          <td class="num">${GROUPS.includes(a.pos) ? edgeCell(a.id) : '<span style="color:var(--ink-muted)">—</span>'}</td>
          <td class="num">${trTxt}</td>
+         <td>${(() => { const rk = riskRead(a.id); return rk
+            ? `<span class="tag ${rk.cls === "buy" ? "buy" : rk.cls === "sell" ? "sell" : "hold"}">${esc(rk.txt)}</span>`
+            : ""; })()}</td>
          <td>${GROUPS.includes(a.pos) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>${postHype(a.id) ? ' <span class="tag diamond">PH</span>' : ""}` : ""}</td>`);
       if (GROUPS.includes(a.pos)) {
         const html = fullRead(a.id);
@@ -1438,6 +1482,14 @@ function evidenceNote() {
     " So use it to judge what a player will SCORE next season, not what the market will pay for him.");
   if (ev.projection) row("modest", ev.projection.claim);
   if (ev.marketShape) row("suggestive", ev.marketShape.claim);
+  // Composed from the risk file itself so the words can never drift from the data.
+  const a = S.riskMeta?.arch;
+  if (a?.RB_elite && a?.WR_elite) row("held",
+    `Measured on ${S.riskMeta.snapshots} weekly value snapshots since 2019: elite RBs run ` +
+    `${(a.RB_elite.vol_med / a.WR_elite.vol_med).toFixed(1)}× the week-to-week turbulence of elite WRs, ` +
+    `with worse peak-to-trough slides (${(a.RB_elite.mdd_med*100).toFixed(0)}% vs ${(a.WR_elite.mdd_med*100).toFixed(0)}%), ` +
+    `and the same ordering holds one tier down. Only ${a.RB_elite.n} elite RBs exist, so the direction is solid and the magnitudes are soft. ` +
+    `Even elite WRs median a ${(a.WR_elite.mdd_med*100).toFixed(0)}% slide inside two years — nothing in dynasty is actually safe.`);
   return box;
 }
 
@@ -1906,6 +1958,7 @@ async function pickLeague(league) {
     await loadValues();
     setStatus("Loading production and usage…");
     await loadSignals();
+    await loadRisk();
     calibrateMarkets();
     try { await loadStats(); } catch { S.stats = {}; S.prodSeason = null; }
     computeEdges();
