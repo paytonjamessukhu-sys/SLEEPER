@@ -175,6 +175,16 @@ tr.taken td { opacity: .38; }
 .asset .rm { color: var(--ink-muted); font-size: 15px; padding: 0 2px; }
 .asset .rm:hover { color: var(--down); }
 .tside .total { text-align: right; font-weight: 700; font-size: 15px; margin-top: 8px; }
+.tside select { width: 100%; margin-bottom: 8px; }
+.tpick { max-height: 230px; overflow-y: auto; border: 1px solid var(--grid);
+  border-radius: 8px; margin-bottom: 10px; }
+.tpick button { display: flex; width: 100%; gap: 8px; align-items: center;
+  padding: 7px 10px; text-align: left; font-size: 13px;
+  border-bottom: 1px solid var(--grid); }
+.tpick button:last-child { border-bottom: none; }
+.tpick button:hover { background: var(--accent-soft); }
+.tpick .sv { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tpick .empty { padding: 14px 10px; }
 .sig-chips { display: flex; gap: 5px; flex-wrap: wrap; margin: -3px 0 6px; cursor: default; }
 .sig-chips .tag { font-size: 9px; padding: 1px 5px; }
 .sig-notes { margin-bottom: 12px; }
@@ -1462,6 +1472,47 @@ function tradeSide(side, label, pool) {
     if (!sugg.children.length) sugg.append(el("div", "empty", "No match"));
   });
   search.append(inp, sugg); box.append(search);
+
+  // Roster browser: Side A opens on YOUR team, Side B on a team you pick.
+  // A trade starts from what the two teams actually hold, not from a blank
+  // search box — the search stays for picks and edge cases.
+  if (!S.tradeTeam) S.tradeTeam = { a: S.myRosterId, b: null };
+  const teams = teamSummaries();
+  const sel = el("select");
+  sel.append(new Option(side === "b" ? "Browse a team…" : "—", ""));
+  teams.forEach(t => {
+    const o = new Option(t.name + (t.me ? " (you)" : ""), t.rid);
+    if (S.tradeTeam[side] === t.rid) o.selected = true;
+    sel.append(o);
+  });
+  sel.addEventListener("change", () => {
+    S.tradeTeam[side] = sel.value ? Number(sel.value) : null; render();
+  });
+  box.append(sel);
+  const rid = S.tradeTeam[side];
+  if (rid != null) {
+    const t = teams.find(x => x.rid === rid);
+    const taken = new Set([...S.trade.a, ...S.trade.b].map(x => x.id));
+    const list = el("div", "tpick");
+    const assets = (t?.assets || []).filter(a => !taken.has(a.id));
+    if (!assets.length) {
+      list.append(el("div", "empty",
+        (t?.assets || []).length ? "Everything here is already in the trade."
+          : `${t?.name || "This team"} has no players yet — the league hasn't drafted.`));
+    } else {
+      for (const a of assets.slice(0, 40)) {
+        const b = el("button", null,
+          `<span class="posbadge">${esc(a.pos)}</span> ${esc(a.name)}<span class="sv">${fmt(a.v)}</span>`);
+        b.addEventListener("click", () => {
+          S.trade[side].push({ kind: "player", id: a.id, name: a.name, pos: a.pos, v: a.v,
+            owner: t.name }); render();
+        });
+        list.append(b);
+      }
+    }
+    box.append(list);
+  }
+
   S.trade[side].forEach((p, i) => {
     const a = el("div", "asset",
       `<span class="posbadge">${esc(p.pos)}</span> ${esc(p.name)}
