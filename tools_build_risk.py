@@ -139,13 +139,33 @@ for pid, p in sleeper.items():
         if p.get("age"):
             ages[pid] = p["age"]
 
+# Raw weekly values per player, downsampled so the file stays shippable:
+# everything from the last year, monthly before that. This is the chart — the
+# shape of seven years of price, which no aggregate number carries.
+def downsample(pts):
+    if not pts:
+        return []
+    cutoff = pts[-1][0][:7]
+    yr, mo = int(cutoff[:4]), int(cutoff[5:7])
+    recent_from = f"{yr-1:04d}-{mo:02d}"
+    keep, seen_month = [], set()
+    for d, v in pts:
+        if d[:7] >= recent_from:
+            keep.append((d, v))
+        elif d[:7] not in seen_month:
+            seen_month.add(d[:7])
+            keep.append((d, v))
+    return keep
+
 out, amb = {}, 0
 for (n, p), m in risk.items():
     cands = by_name.get((n, p), [])
     if len(cands) != 1:
         amb += 1 if cands else 0
         continue
-    out[cands[0]] = {**m, "pos": p}
+    ds = downsample(series[(n, p)])
+    out[cands[0]] = {**m, "pos": p,
+                     "hist": [[d[2:10], round(v, 1)] for d, v in ds]}  # "YY-MM-DD", share bp
 
 # ---------- archetype table: position x absolute value tier ----------
 # Tiers are ABSOLUTE share bands, not percentiles. 879 of 1000 players here are
