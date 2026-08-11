@@ -179,6 +179,20 @@ tr.me td { background: var(--accent-soft); }
 .sig-notes { margin-bottom: 12px; }
 .sig-note { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-bottom: 4px; }
 .sig-note b { color: var(--ink-1); }
+.trade-idea { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  margin-bottom: 12px; background: var(--surface); }
+.ti-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ti-vs { font-weight: 700; font-size: 13px; }
+.ti-fair { margin-left: auto; font-size: 12px; color: var(--ink-muted); }
+.ti-body { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.ti-side { flex: 1; min-width: 200px; font-size: 13px; }
+.ti-side b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--ink-muted); margin-bottom: 2px; }
+.ti-val { display: block; font-weight: 700; margin-top: 2px; }
+.ti-arrow { font-size: 18px; color: var(--ink-muted); }
+.ti-why { font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+@media (max-width: 640px) { .ti-body { flex-direction: column; align-items: stretch; }
+  .ti-arrow { text-align: center; } }
 .verdict { margin-top: 16px; }
 .vbar { display: flex; height: 22px; margin: 10px 0 6px; }
 .vbar > div { border-radius: 4px; }
@@ -285,6 +299,7 @@ footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
     <button data-tab="power" class="on">Power Rankings</button>
     <button data-tab="rosters">Rosters</button>
     <button data-tab="board">Buy / Sell Board</button>
+    <button data-tab="tradefinder">Trade Finder</button>
     <button data-tab="trade">Trade Calculator</button>
     <button data-tab="freeagents">Free Agents</button>
     <button data-tab="standings">Standings</button>
@@ -910,6 +925,158 @@ function teamSummaries() {
   }).sort((a,b) => b.total - a.total);
 }
 
+/* =============================== trade finder =============================== */
+/* Same slot-fill as starterValue, but keeping the position breakdown instead of
+   collapsing it to one number — this is what "need" and "surplus" are measured
+   against. A team's starter total can look fine while it's one hit away from a
+   hole at RB2; the aggregate hides exactly the thing a trade would fix. */
+function rosterBreakdown(roster) {
+  const slots = (S.league?.roster_positions || []).filter(s => !["BN","IR","TAXI"].includes(s));
+  const pool = new Map((roster.players || []).filter(id => id && id !== "0")
+    .map(id => [id, { pos: pinfo(id).p, v: val(id) }]));
+  const order = [...slots].sort((a,b) => (POS_SLOTS[a]?.length || 9) - (POS_SLOTS[b]?.length || 9));
+  const starterByPos = { QB:0, RB:0, WR:0, TE:0 }, starterIds = new Set();
+  for (const slot of order) {
+    const ok = POS_SLOTS[slot]; if (!ok) continue;
+    let best = null;
+    for (const [id, p] of pool) if (ok.includes(p.pos) && (!best || p.v > pool.get(best).v)) best = id;
+    if (best) { const p = pool.get(best);
+      if (GROUPS.includes(p.pos)) starterByPos[p.pos] += p.v;
+      starterIds.add(best); pool.delete(best); }
+  }
+  const benchByPos = { QB:0, RB:0, WR:0, TE:0 }, benchDepth = { QB:0, RB:0, WR:0, TE:0 };
+  for (const [id, p] of pool) if (GROUPS.includes(p.pos)) {
+    benchByPos[p.pos] += p.v;
+    if (p.v >= 500) benchDepth[p.pos]++;         // rosterable, not deep-bench noise
+  }
+  return { starterByPos, benchByPos, benchDepth, starterIds };
+}
+
+function leagueNeeds() {
+  const teams = S.rosters.map(r => ({ rid: r.roster_id, bd: rosterBreakdown(r) }));
+  const median = (arr) => { const s = [...arr].sort((a,b) => a-b), n = s.length;
+    return n ? (n % 2 ? s[(n-1)/2] : (s[n/2-1] + s[n/2]) / 2) : 0; };
+  const med = {};
+  for (const g of GROUPS) med[g] = median(teams.map(t => t.bd.starterByPos[g] || 0));
+  return { med, byTeam: Object.fromEntries(teams.map(t => [t.rid, t.bd])) };
+}
+
+/* Contender / fringe / rebuilder, from roster shape rather than record — a
+   startup dynasty league has no games played yet, so wins can't classify
+   anyone. A team built to win now stacks starter value; a team building for
+   later stockpiles youth. Both are visible before a single snap is played. */
+function teamArchetype(rid, teams) {
+  const n = teams.length;
+  const t = teams.find(x => x.rid === rid);
+  if (!t) return null;
+  const starterRank = [...teams].sort((a,b) => b.starters - a.starters).findIndex(x => x.rid === rid) + 1;
+  const ageRank = [...teams].filter(x => x.age).sort((a,b) => a.age - b.age).findIndex(x => x.rid === rid) + 1;
+  if (starterRank <= Math.ceil(n/3)) return { cls: "contender", why: `#${starterRank} of ${n} in starter value` };
+  if (t.age && ageRank <= Math.ceil(n/3) && starterRank > Math.ceil(n*2/3))
+    return { cls: "rebuilder", why: `#${starterRank} in starters but the youngest core in the league` };
+  return { cls: "fringe", why: `#${starterRank} of ${n} — not clearly buying or selling` };
+}
+
+/* One trade package between my team and one opponent. Tries 1-for-1 first,
+   then a 2-for-1 consolidation (your depth for their one difference-maker) —
+   the shape a pick-poor team actually needs, since you can't buy up with picks
+   you don't have. Every candidate is scored on three things: does the value
+   check out, does it fill an actual hole on both sides, and does it move Edge
+   in the acquirer's favor. Fairness dominates the score; edge and need only
+   break ties, because a "great edge" trade nobody would accept is not a trade. */
+function bestPackage(myRid, oppRid, needs) {
+  const myBd = needs.byTeam[myRid], opBd = needs.byTeam[oppRid];
+  if (!myBd || !opBd) return null;
+  const myRoster = S.rosters.find(r => r.roster_id === myRid);
+  const opRoster = S.rosters.find(r => r.roster_id === oppRid);
+  const need = (bd, g) => bd.starterByPos[g] < needs.med[g] * 0.85;
+  const surplus = (bd, g) => bd.benchDepth[g] >= 2 || bd.starterByPos[g] > needs.med[g] * 1.15;
+
+  const rosterAssets = (roster, excludeStarters) => (roster.players || [])
+    .filter(id => id && id !== "0" && GROUPS.includes(pinfo(id).p) && val(id) >= 300)
+    .map(id => ({ id, pos: pinfo(id).p, v: val(id), tag: edgeTag(id).cls,
+                  starter: rosterBreakdown(roster).starterIds.has(id) }))
+    .filter(a => !excludeStarters || true);       // starters stay eligible; casual leagues trade them
+
+  const getPool = rosterAssets(opRoster).sort((a,b) => {
+    const pref = { diamond:3, buy:2, rental:1 }; return (pref[b.tag]||0) - (pref[a.tag]||0) || b.v - a.v; });
+  const givePool = rosterAssets(myRoster).sort((a,b) => {
+    const pref = { sell:3, hold:2, watch:1 }; return (pref[b.tag]||0) - (pref[a.tag]||0) || b.v - a.v; })
+    .filter(a => a.tag !== "diamond");             // don't offer away your own mispriced gems
+
+  const myDeficit = GROUPS.filter(g => need(myBd, g));
+  const opDeficit = GROUPS.filter(g => need(opBd, g));
+  const opSurplusForMe = GROUPS.filter(g => myDeficit.includes(g) && surplus(opBd, g));
+  const mySurplusForThem = GROUPS.filter(g => opDeficit.includes(g) && surplus(myBd, g));
+
+  const score = (give, get) => {
+    const gv = give.reduce((s,x) => s+x.v, 0), tv = get.reduce((s,x) => s+x.v, 0);
+    if (!gv || !tv) return null;
+    const fair = 1 - Math.abs(gv-tv) / Math.max(gv,tv);
+    if (fair < 0.72) return null;                  // too lopsided to be a real proposal
+    const edgeGain = get.reduce((s,x) => s + (S.edges[x.id]?.edge || 0), 0)
+                    - give.reduce((s,x) => s + (S.edges[x.id]?.edge || 0), 0);
+    const needFit = (get.some(x => myDeficit.includes(x.pos)) ? 1 : 0)
+                   + (give.some(x => opDeficit.includes(x.pos)) ? 1 : 0);
+    return { give, get, gv, tv, fair, edgeGain, needFit,
+      s: fair*1000 + Math.max(-1500, Math.min(1500, edgeGain))*0.3 + needFit*350 };
+  };
+
+  const candidates = [];
+  const getFrom = (pos) => getPool.filter(x => !pos.length || pos.includes(x.pos));
+  const giveFrom = (pos) => givePool.filter(x => !pos.length || pos.includes(x.pos));
+  // Need-matched and unfiltered lists overlap by construction — a need-matched
+  // player IS also in the unfiltered pool — so concatenating them puts the same
+  // id at two array indices. Deduping by id before pairing is what stops the
+  // 2-for-1 search from "trading" a player for himself.
+  const dedupe = (list) => { const seen = new Set();
+    return list.filter(x => seen.has(x.id) ? false : (seen.add(x.id), true)); };
+
+  // 1-for-1, need-matched first, falling back to any reasonable value match
+  const oneForOneGets = dedupe(getFrom(opSurplusForMe).slice(0, 6).concat(getFrom([]).slice(0, 4)));
+  const oneForOneGives = dedupe(giveFrom(mySurplusForThem).slice(0, 6).concat(giveFrom([]).slice(0, 4)));
+  for (const get of oneForOneGets) {
+    for (const give of oneForOneGives) {
+      if (give.id === get.id) continue;
+      const r = score([give], [get]); if (r) candidates.push(r);
+    }
+  }
+  // 2-for-1: my two depth pieces for their one difference-maker
+  const bigGets = dedupe(getFrom(opSurplusForMe).slice(0, 4).concat(getFrom([]).slice(0, 3)));
+  const smallGives = dedupe(giveFrom(mySurplusForThem).concat(giveFrom([])))
+    .filter(x => !x.starter || x.v < 3500);
+  for (const get of bigGets) {
+    for (let i = 0; i < smallGives.length; i++) for (let j = i+1; j < smallGives.length; j++) {
+      const a = smallGives[i], b = smallGives[j];
+      if (a.id === get.id || b.id === get.id) continue;
+      const r = score([a,b], [get]); if (r) candidates.push(r);
+    }
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a,b) => b.s - a.s);
+  return candidates[0];
+}
+
+/* Across the whole league: one best idea per opponent, ranked. This is the
+   "every team" sweep — it does not stop at the first good-looking trade, it
+   checks all of them and surfaces the strongest. */
+function generateTradeIdeas() {
+  if (!S.myRosterId) return [];
+  const teams = teamSummaries();
+  const needs = leagueNeeds();
+  const myArch = teamArchetype(S.myRosterId, teams);
+  const ideas = [];
+  for (const t of teams) {
+    if (t.rid === S.myRosterId) continue;
+    if (!(t.roster.players || []).length) continue;    // nothing to trade for
+    const pkg = bestPackage(S.myRosterId, t.rid, needs);
+    if (pkg) ideas.push({ oppRid: t.rid, oppName: t.name,
+      oppArch: teamArchetype(t.rid, teams), ...pkg });
+  }
+  ideas.sort((a,b) => b.s - a.s);
+  return { ideas, myArch, needs, teams };
+}
+
 /* =============================== tooltip =============================== */
 const tt = $("#tooltip");
 function showTT(html, ev) { tt.innerHTML = html; tt.style.display = "block"; moveTT(ev); }
@@ -935,7 +1102,7 @@ function render() {
     b.classList.toggle("on", b.dataset.tab === S.tab));
   if (!S.league) return;
   ({ power: renderPower, rosters: renderRosters, board: renderBoard,
-     trade: renderTrade, freeagents: renderFreeAgents,
+     tradefinder: renderTradeFinder, trade: renderTrade, freeagents: renderFreeAgents,
      standings: renderStandings, market: renderMarket }[S.tab])(v);
 }
 
@@ -1231,6 +1398,79 @@ function evidenceNote() {
   if (ev.projection) row("modest", ev.projection.claim);
   if (ev.marketShape) row("suggestive", ev.marketShape.claim);
   return box;
+}
+
+/* ---------- trade finder ---------- */
+function pkgLine(ids) { return ids.map(x => `${x.pos} ${S.values[x.id]?.name || pinfo(x.id).n}`).join(" + "); }
+function renderTradeFinder(v) {
+  if (!S.myRosterId) {
+    v.append(el("div", "card"), el("div", "empty", "Couldn't find your roster in this league."));
+    return;
+  }
+  const anyRostered = S.rosters.some(r => (r.players || []).length > 0);
+  if (!anyRostered) {
+    const card = el("div", "card");
+    card.append(el("h2", null, "Trade Finder"),
+      el("div", "empty",
+        "Every roster in this league is empty — nobody has drafted yet. " +
+        "Trade Finder needs real rosters to compare needs against; it has nothing to work with until then. " +
+        "The engine itself is live and already checked every other team in this league — there's just nobody on them."));
+    v.append(card); return;
+  }
+  const { ideas, myArch, teams } = generateTradeIdeas();
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Your team", myArch ? myArch.cls.toUpperCase() : "—", myArch?.why || ""),
+    statTile("Trade ideas found", fmt(ideas.length), `across ${teams.length - 1} other rosters`),
+    statTile("Best fit", ideas[0] ? (ideas[0].fair*100).toFixed(0)+"% value match" : "—",
+      ideas[0] ? `vs ${ideas[0].oppName}` : ""));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Trade Finder"),
+    el("div", "sub", "Checked every other roster in the league for a fit: value that clears within 28%, " +
+      "matched where possible to a hole on your roster and a hole on theirs. Ranked by fairness first — " +
+      "edge and need only break ties, because an unfair trade nobody accepts is not a trade."));
+  card.append(evidenceNote());
+  if (!ideas.length) {
+    card.append(el("div", "empty",
+      "No package cleared the fairness bar against any opponent right now. That will change as rosters fill in and prices move."));
+    v.append(card); return;
+  }
+  for (const idea of ideas.slice(0, 10)) {
+    const box = el("div", "trade-idea");
+    const hdr = el("div", "ti-hdr");
+    hdr.append(el("span", "ti-vs", `vs ${esc(idea.oppName)}`),
+      idea.oppArch ? el("span", `tag ${idea.oppArch.cls === "contender" ? "buy" : idea.oppArch.cls === "rebuilder" ? "sell" : "hold"}`,
+        idea.oppArch.cls.toUpperCase()) : null,
+      el("span", "ti-fair", `${(idea.fair*100).toFixed(0)}% value match`));
+    box.append(hdr);
+    const body = el("div", "ti-body");
+    body.append(
+      el("div", "ti-side", `<b>You send</b> ${esc(pkgLine(idea.give))} <span class="ti-val">${fmt(idea.gv)}</span>`),
+      el("div", "ti-arrow", "⇄"),
+      el("div", "ti-side", `<b>You get</b> ${esc(pkgLine(idea.get))} <span class="ti-val">${fmt(idea.tv)}</span>`));
+    box.append(body);
+    const why = el("div", "ti-why");
+    const winBits = [];
+    if (idea.needFit) winBits.push("fills a real hole on both sides, not just moving value around");
+    if (idea.edgeGain > 300) winBits.push(`you gain ${fmt(idea.edgeGain)} in Edge — the pieces coming back are underpriced for what they produce`);
+    else if (idea.edgeGain < -300) winBits.push(`costs you ${fmt(Math.abs(idea.edgeGain))} in Edge — you're paying a premium for fit, worth knowing`);
+    why.append(el("div", null, `<b>Why it's fair:</b> ${esc(winBits.length ? winBits.join("; ") : "value lines up closely on both sides")}.`));
+    if (idea.oppArch) why.append(el("div", null,
+      `<b>Why they might say yes:</b> ${esc(idea.oppName)} reads as a ${idea.oppArch.cls} (${idea.oppArch.why}) — ` +
+      `${idea.oppArch.cls === "contender" ? "win-now teams pay for immediate starters." :
+        idea.oppArch.cls === "rebuilder" ? "rebuilding teams want the pieces you're sending, not the ones you're asking for." :
+        "not clearly buying or selling, so fit matters more than saying no."}`));
+    box.append(why);
+    const html = idea.get.concat(idea.give).map(x => fullRead(x.id)).join("<hr style='border-color:var(--grid);margin:8px 0'>");
+    box.addEventListener("mousemove", ev => showTT(html, ev));
+    box.addEventListener("mouseleave", hideTT);
+    box.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    card.append(box);
+  }
+  card.append(el("div", "sub", "Hover or tap a card for the full reasoning on every player in the deal."));
+  v.append(card);
 }
 
 /* ---------- buy-low / sell-high board ---------- */
