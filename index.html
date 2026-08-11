@@ -212,9 +212,15 @@ tr.taken td { opacity: .38; }
   border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite;
   vertical-align: -2px; margin-right: 6px; }
 @keyframes sp { to { transform: rotate(360deg); } }
-#tooltip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface);
-  border: 1px solid var(--baseline); border-radius: 8px; padding: 8px 10px; font-size: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.22); display: none; max-width: 260px; }
+#tooltip { position: fixed; z-index: 50; right: 14px; bottom: 14px; background: var(--surface);
+  border: 1px solid var(--baseline); border-radius: 12px; padding: 12px 14px; font-size: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.35); display: none;
+  width: min(380px, calc(100vw - 28px)); max-height: 62vh; overflow-y: auto; }
+#tooltip .tt-close { position: sticky; top: 0; float: right; margin: -4px -6px 0 8px;
+  color: var(--ink-muted); font-size: 16px; line-height: 1; padding: 2px 6px;
+  background: var(--surface); border-radius: 6px; }
+#tooltip .tt-close:hover { color: var(--down); }
+#tooltip .tt-row { margin-bottom: 6px; line-height: 1.5; }
 #tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
 #tooltip .tt-row { display: flex; gap: 10px; justify-content: space-between; color: var(--ink-2); }
 footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
@@ -1182,15 +1188,16 @@ function generateTradeIdeas() {
 
 /* =============================== tooltip =============================== */
 const tt = $("#tooltip");
-function showTT(html, ev) { tt.innerHTML = html; tt.style.display = "block"; moveTT(ev); }
-function moveTT(ev) {
-  const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
-  let x = ev.clientX + pad, y = ev.clientY + pad;
-  if (x + w > innerWidth - 8) x = ev.clientX - w - pad;
-  if (y + h > innerHeight - 8) y = ev.clientY - h - pad;
-  tt.style.left = x + "px"; tt.style.top = y + "px";
+/* A docked reading panel, not a cursor-chasing tooltip. The reads grew into
+   paragraphs, and a paragraph glued to the pointer sits on top of the exact
+   rows being compared — so it opens on click, in the corner, and stays put. */
+function showTT(html, ev) {
+  tt.innerHTML = '<button class="tt-close" title="Close">✕</button>' + html;
+  tt.querySelector(".tt-close").addEventListener("click", hideTT);
+  tt.style.display = "block";
 }
 function hideTT() { tt.style.display = "none"; }
+tt.addEventListener("click", ev => ev.stopPropagation());   // clicks inside don't dismiss
 
 /* =============================== views =============================== */
 function setStatus(msg) { const s = $("#status");
@@ -1228,7 +1235,7 @@ function renderPower(v) {
 
   const card = el("div", "card");
   card.append(el("h2", null, "Roster value power rankings"),
-    el("div", "sub", "Total roster value by position group — hover a segment for the pieces"));
+    el("div", "sub", "Total roster value by position group — tap a segment for the pieces"));
   const legend = el("div", "legend");
   for (const g of GROUPS) legend.append(el("span", "key",
     `<span class="swatch" style="background:var(${GROUP_VARS[g]})"></span>${g}`));
@@ -1251,10 +1258,9 @@ function renderPower(v) {
       const top = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "Other") === g).slice(0, 3);
       const html = `<div class="tt-title">${esc(t.name)} — ${g}: ${fmt(amt)}</div>` +
         top.map(a => `<div class="tt-row"><span>${esc(a.name)}</span><span>${fmt(a.v)}</span></div>`).join("");
-      seg.addEventListener("mousemove", ev => showTT(html, ev));
-      seg.addEventListener("mouseleave", hideTT);
       // Touch has no hover: tap a segment to pin the same tooltip.
       seg.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+      seg.style.cursor = "pointer";
       bar.append(seg);
     }
     row.append(bar, el("div", "val", fmt(t.total)));
@@ -1324,8 +1330,6 @@ function renderRosters(v) {
          <td>${GROUPS.includes(a.pos) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>${postHype(a.id) ? ' <span class="tag diamond">PH</span>' : ""}` : ""}</td>`);
       if (GROUPS.includes(a.pos)) {
         const html = fullRead(a.id);
-        row.addEventListener("mousemove", ev => showTT(html, ev));
-        row.addEventListener("mouseleave", hideTT);
         row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
       }
       tb.append(row);
@@ -1468,8 +1472,6 @@ function tradeSide(side, label, pool) {
     const chips = sigChips(p.id);
     if (chips) {
       const html = fullRead(p.id);
-      chips.addEventListener("mousemove", ev => showTT(html, ev));
-      chips.addEventListener("mouseleave", hideTT);
       chips.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
       box.append(chips);
     }
@@ -1654,15 +1656,13 @@ function renderDraftInner(v) {
        <td>${r.pk ? `<span class="tag sell">R${r.pk.round} · ${esc(userByRid.get(r.pk.by) || "taken")}</span>`
                   : '<span style="color:var(--ink-muted)">available</span>'}</td>`);
     const html = fullRead(r.id);
-    row.addEventListener("mousemove", ev => showTT(html, ev));
-    row.addEventListener("mouseleave", hideTT);
     row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
     tb.append(row);
   }
   tbl.append(tb); card.append(tbl);
   card.append(el("div", "sub",
     `Showing ${shown.length} of ${rows.length}. Players with no projection (rookies, injuries) sort by market value — ` +
-    `their draft-capital and development reads are in the hover, which is where late-round picks live.`));
+    `their draft-capital and development reads open on tap, which is where late-round picks live.`));
   v.append(card);
 }
 
@@ -1730,12 +1730,10 @@ function renderTradeFinder(v) {
         "not clearly buying or selling, so fit matters more than saying no."}`));
     box.append(why);
     const html = idea.get.concat(idea.give).map(x => fullRead(x.id)).join("<hr style='border-color:var(--grid);margin:8px 0'>");
-    box.addEventListener("mousemove", ev => showTT(html, ev));
-    box.addEventListener("mouseleave", hideTT);
     box.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
     card.append(box);
   }
-  card.append(el("div", "sub", "Hover or tap a card for the full reasoning on every player in the deal."));
+  card.append(el("div", "sub", "Tap a card for the full reasoning on every player in the deal."));
   v.append(card);
 }
 
@@ -1784,13 +1782,11 @@ function renderDevBoard(v, owner) {
        <td class="num">${fmt(val(r.id))}</td>
        <td class="num">${d ? esc(d.txt) : '<span style="color:var(--ink-muted)">—</span>'}</td>`);
     const html = fullRead(r.id);
-    row.addEventListener("mousemove", ev => showTT(html, ev));
-    row.addEventListener("mouseleave", hideTT);
     row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
     tb.append(row);
   }
   tbl.append(tb); card.append(tbl);
-  card.append(el("div", "sub", `Showing ${Math.min(30, rows.length)} of ${rows.length} · hover or tap a row for the full reasoning.`));
+  card.append(el("div", "sub", `Showing ${Math.min(30, rows.length)} of ${rows.length} · tap a row for the full reasoning.`));
   v.append(card);
 }
 
@@ -1894,8 +1890,6 @@ function renderBoard(v) {
        <td>${(() => { const a = ageRead(r.id); return a ? `<span class="tag ${a.cls}">${esc(a.txt)}</span>` : ""; })()}</td>`);
     const html = fullRead(r.id, r.own && !r.own.mine
       ? [`Held by ${r.own.name} — this is a trade, not a waiver add.`] : []);
-    row.addEventListener("mousemove", ev => showTT(html, ev));
-    row.addEventListener("mouseleave", hideTT);
     row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
     tb.append(row);
   }
@@ -1997,14 +1991,12 @@ function renderFreeAgents(v) {
        <td class="num">${trTxt}</td>
        <td><span class="tag ${tag.cls}">${esc(tag.txt)}</span>${postHype(p.id) ? ' <span class="tag diamond">POST-HYPE</span>' : ""}</td>`);
     const html = fullRead(p.id);
-    tr.addEventListener("mousemove", ev => showTT(html, ev));
-    tr.addEventListener("mouseleave", hideTT);
     tr.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
     tb.append(tr);
   }
   tbl.append(tb); card.append(tbl);
   card.append(el("div", "sub", `Showing ${rows.length} of ${fmt(shown.length)} · ` +
-    `production from the ${esc(S.prodSeason || "—")} season · hover or tap a row for the reasoning`));
+    `production from the ${esc(S.prodSeason || "—")} season · tap a row for the reasoning`));
   v.append(card);
 }
 
