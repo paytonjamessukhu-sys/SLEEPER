@@ -174,6 +174,11 @@ tr.me td { background: var(--accent-soft); }
 .asset .rm { color: var(--ink-muted); font-size: 15px; padding: 0 2px; }
 .asset .rm:hover { color: var(--down); }
 .tside .total { text-align: right; font-weight: 700; font-size: 15px; margin-top: 8px; }
+.sig-chips { display: flex; gap: 5px; flex-wrap: wrap; margin: -3px 0 6px; cursor: default; }
+.sig-chips .tag { font-size: 9px; padding: 1px 5px; }
+.sig-notes { margin-bottom: 12px; }
+.sig-note { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-bottom: 4px; }
+.sig-note b { color: var(--ink-1); }
 .verdict { margin-top: 16px; }
 .vbar { display: flex; height: 22px; margin: 10px 0 6px; }
 .vbar > div { border-radius: 4px; }
@@ -1015,13 +1020,14 @@ function renderRosters(v) {
   const maxV = Math.max(...t.assets.map(a => a.v), 1);
   const tbl = el("table", "posgroup");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
-    <th class="num">Pos rk</th><th style="width:28%">Value</th><th class="num">Pts/gm</th>
+    <th class="num">Pos rk</th><th style="width:22%">Value</th><th class="num">Pts/gm</th>
+    <th class="num">Proj</th><th class="num">Mkt gap</th>
     <th class="num">Edge</th><th class="num">30d</th><th>Read</th></tr></thead>`;
   const tb = el("tbody");
   for (const g of [...GROUPS, "OTH"]) {
     const rows = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "OTH") === g);
     if (!rows.length) continue;
-    tb.append(el("tr", null, `<td class="gh" colspan="9">${g === "OTH" ? "Other" : g}</td>`));
+    tb.append(el("tr", null, `<td class="gh" colspan="11">${g === "OTH" ? "Other" : g}</td>`));
     for (const a of rows) {
       const p = pinfo(a.id), fcv = S.values[a.id];
       const e = S.edges[a.id], tag = edgeTag(a.id);
@@ -1035,9 +1041,14 @@ function renderRosters(v) {
          <td><span class="meter"><span class="track"><span class="fill" style="width:${a.v/maxV*100}%"></span></span>
              <span class="mval">${a.v ? fmt(a.v) : "—"}</span></span></td>
          <td class="num">${e?.ppg ? e.ppg.toFixed(1) : "—"}</td>
+         <td class="num">${(() => { const pj = projection(a.id); return pj
+            ? `<b>${pj.ppg.toFixed(1)}</b>` : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
+         <td class="num">${(() => { const ms = marketSplit(a.id); return ms && ms.dir !== "agree"
+            ? `<span class="${ms.gap < 0 ? "edge-pos" : "edge-neg"}">${esc(ms.txt)}</span>`
+            : '<span style="color:var(--ink-muted)">·</span>'; })()}</td>
          <td class="num">${GROUPS.includes(a.pos) ? edgeCell(a.id) : '<span style="color:var(--ink-muted)">—</span>'}</td>
          <td class="num">${trTxt}</td>
-         <td>${GROUPS.includes(a.pos) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>` : ""}</td>`);
+         <td>${GROUPS.includes(a.pos) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>${postHype(a.id) ? ' <span class="tag diamond">PH</span>' : ""}` : ""}</td>`);
       if (GROUPS.includes(a.pos)) {
         const html = fullRead(a.id);
         row.addEventListener("mousemove", ev => showTT(html, ev));
@@ -1064,6 +1075,30 @@ function tradePool() {
   S.picks.forEach((pk, i) => pool.push({ kind:"pick", id:"pick"+i, name: pk.name, pos:"PICK", v: pk.v, owner:null }));
   return pool.sort((a,b) => b.v - a.v);
 }
+/* Every signal this app has on one asset, compressed to a chip row. The trade
+   calculator is the tool this whole build points at — showing raw price here
+   and nothing else would mean everything upstream never reaches the moment
+   it's meant to inform. Picks and ungraded players get nothing; there's
+   nothing honest to show them yet. */
+function assetSignals(id) {
+  if (!S.edges[id]) return null;               // picks, or players with no edge record
+  const t = edgeTag(id), l = luckRead(id), a = ageRead(id), ms = marketSplit(id), ph = postHype(id);
+  return { t, l, a, ms, ph };
+}
+function sigChips(id) {
+  const s = assetSignals(id);
+  if (!s) return null;
+  const row = el("div", "sig-chips");
+  if (s.t && s.t.cls !== "hold" && s.t.cls !== "nosample")
+    row.append(el("span", `tag ${s.t.cls}`, esc(s.t.txt)));
+  if (s.l && s.l.cls !== "hold") row.append(el("span", `tag ${s.l.cls}`, esc(s.l.txt)));
+  if (s.a && ["diamond","sell"].includes(s.a.cls)) row.append(el("span", `tag ${s.a.cls}`, esc(s.a.txt)));
+  if (s.ms && s.ms.dir !== "agree") row.append(el("span", `tag ${s.ms.dir === "cheap-here" ? "buy" : "sell"}`,
+    `mkt ${esc(s.ms.txt)}`));
+  if (s.ph) row.append(el("span", "tag diamond", "POST-HYPE"));
+  return row.children.length ? row : null;
+}
+
 function renderTrade(v) {
   const pool = tradePool();
   const wrap = el("div", "grid2");
@@ -1075,6 +1110,38 @@ function renderTrade(v) {
   card.append(el("h2", null, "Verdict"));
   if (!a && !b) card.append(el("div", "empty", "Add players or picks to both sides to compare."));
   else {
+    // One note PER ASSET, not per bucket — edge and luck can legitimately point
+    // opposite ways on the same player (underpriced for his production, but
+    // that production was itself touchdown-lucky), and splitting them into
+    // separate buy/sell tallies made the same name appear on both lists in the
+    // same breath, which reads as a bug rather than the nuance it actually is.
+    const sideRead = (side, label) => {
+      const lines = [];
+      for (const x of S.trade[side]) {
+        const s = assetSignals(x.id);
+        if (!s) continue;
+        const bits = [];
+        if (["diamond","buy","rental"].includes(s.t.cls)) bits.push("underpriced for his production");
+        else if (s.t.cls === "sell") bits.push("overpriced for his production");
+        if (s.l?.cls === "sell") bits.push("touchdown-lucky last season");
+        else if (s.l?.cls === "buy") bits.push("touchdown-unlucky last season");
+        if (s.ms && s.ms.dir !== "agree")
+          bits.push(`priced ${s.ms.dir === "dear-here" ? "above" : "below"} the consensus market (${s.ms.txt})`);
+        if (s.ph) bits.push("fits the post-hype pattern — real capital, still young, forgotten by the market");
+        if (bits.length) lines.push(`${x.name}: ${bits.join("; ")}`);
+      }
+      if (!lines.length) return null;
+      const d = el("div", "sig-note");
+      d.append(el("b", null, esc(label) + " "));
+      lines.forEach((l, i) => { if (i) d.append(el("br")); d.append(document.createTextNode(l)); });
+      return d;
+    };
+    const rA = sideRead("a", "Side A"), rB = sideRead("b", "Side B");
+    if (rA || rB) {
+      const box = el("div", "sig-notes");
+      if (rA) box.append(rA); if (rB) box.append(rB);
+      card.append(box);
+    }
     const total = a + b || 1;
     const bar = el("div", "vbar");
     const ad = el("div", "a"), bd = el("div", "b");
@@ -1125,6 +1192,14 @@ function tradeSide(side, label, pool) {
     const rm = el("button", "rm", "✕");
     rm.addEventListener("click", () => { S.trade[side].splice(i, 1); render(); });
     a.append(rm); box.append(a);
+    const chips = sigChips(p.id);
+    if (chips) {
+      const html = fullRead(p.id);
+      chips.addEventListener("mousemove", ev => showTT(html, ev));
+      chips.addEventListener("mouseleave", hideTT);
+      chips.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+      box.append(chips);
+    }
   });
   const sum = S.trade[side].reduce((s,x) => s + x.v, 0);
   box.append(el("div", "total", sum ? fmt(sum) : ""));
@@ -1330,8 +1405,9 @@ function renderFreeAgents(v) {
   const tbl = el("table");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
     <th class="num">Pts/gm</th><th class="num">Gm</th><th class="num">Produces</th>
-    <th class="num">Priced</th><th class="num">Trend</th><th class="num">Value</th>
-    <th class="num">Edge</th><th class="num">30d</th><th>Read</th></tr></thead>`;
+    <th class="num">Priced</th><th class="num">Trend</th><th class="num">Proj</th>
+    <th class="num">Value</th><th class="num">Mkt gap</th><th class="num">Edge</th>
+    <th class="num">30d</th><th>Read</th></tr></thead>`;
   const tb = el("tbody");
   for (const p of rows) {
     const e = p.ed, tag = edgeTag(p.id);
@@ -1348,10 +1424,15 @@ function renderFreeAgents(v) {
        <td class="num">${(() => { const t = usageTrend(p.id); return t
           ? `<span class="${t.dir === "up" ? "edge-pos" : t.dir === "down" ? "edge-neg" : ""}">${esc(t.txt)}</span>`
           : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
+       <td class="num">${(() => { const pj = projection(p.id); return pj
+          ? `<b>${pj.ppg.toFixed(1)}</b>` : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
        <td class="num">${fmt(p.v)}</td>
+       <td class="num">${(() => { const ms = marketSplit(p.id); return ms && ms.dir !== "agree"
+          ? `<span class="${ms.gap < 0 ? "edge-pos" : "edge-neg"}">${esc(ms.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">·</span>'; })()}</td>
        <td class="num">${edgeCell(p.id)}</td>
        <td class="num">${trTxt}</td>
-       <td><span class="tag ${tag.cls}">${esc(tag.txt)}</span></td>`);
+       <td><span class="tag ${tag.cls}">${esc(tag.txt)}</span>${postHype(p.id) ? ' <span class="tag diamond">POST-HYPE</span>' : ""}</td>`);
     const html = fullRead(p.id);
     tr.addEventListener("mousemove", ev => showTT(html, ev));
     tr.addEventListener("mouseleave", hideTT);
