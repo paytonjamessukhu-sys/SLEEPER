@@ -661,7 +661,19 @@ function opportunity(id) {
    Negative luck on heavy usage is the buy; positive luck on light usage is the sell. */
 function luckRead(id) {
   const e = S.edges[id];
-  if (!e || e.tdLuck == null) return null;
+  if (!e) return null;
+  // Prefer the full expected-points gap (ffverse xFP: yardage, completions and
+  // touchdowns priced per play) over the in-house TD-only line when it shipped.
+  const fxd = S.sig?.[id]?.s?.[S.sigMeta?.latest]?.fxd;
+  if (fxd != null) {
+    if (fxd <= -1.5) return { cls:"buy", txt:`${fxd.toFixed(1)}/gm`, dir:"unlucky",
+      why:`Scored ${Math.abs(fxd).toFixed(1)} points a game below what his opportunities were worth (ffverse expected-points model). The opportunities are the part that carries over.` };
+    if (fxd >= 1.5) return { cls:"sell", txt:`+${fxd.toFixed(1)}/gm`, dir:"lucky",
+      why:`Scored ${fxd.toFixed(1)} points a game above what his opportunities were worth. That overshoot is the least repeatable part of his season.` };
+    return { cls:"hold", txt:(fxd>0?"+":"")+fxd.toFixed(1)+"/gm", dir:"neutral",
+      why:"Scoring landed about where his opportunities said it should (ffverse expected-points model)." };
+  }
+  if (e.tdLuck == null) return null;
   const l = e.tdLuck;
   if (l <= -2) return { cls:"buy", txt:`${l.toFixed(1)} TD`, dir:"unlucky",
     why:`Scored ${Math.abs(l).toFixed(1)} fewer touchdowns than his volume implied. Touchdowns regress; the usage is what carries over.` };
@@ -1215,7 +1227,7 @@ function renderBoard(v) {
   const tbl = el("table");
   tbl.innerHTML = `<thead><tr><th>Player</th><th>Held by</th><th class="num">Age</th>
     <th class="num">Usage</th><th>Tier</th><th class="num">Trend</th><th class="num">Pts/gm</th>
-    <th class="num">Adj</th><th class="num">Proj</th><th class="num">TD luck</th>
+    <th class="num">Adj</th><th class="num">Proj</th><th class="num">Luck</th>
     <th class="num">Value</th><th class="num">Mkt gap</th><th class="num">Edge</th>
     <th>Age curve</th></tr></thead>`;
   const tb = el("tbody");

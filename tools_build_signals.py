@@ -135,6 +135,36 @@ for r in fetch_csv(f"{REL}/draft_picks/draft_picks.csv"):
     if nm:
         draft_by_name[(nm, r["position"])] = d
 
+# ---------- expected fantasy points (ffverse/ffopportunity) ----------
+# A per-play XGBoost model of what an average player scores given each
+# opportunity, published as automated weekly releases. Strictly richer than the
+# in-house expected-TD line: it prices yardage and completion luck too. Tested
+# before adoption: as a next-season PREDICTOR it adds nothing over what ships
+# (ridge RMSE got slightly worse with it), so it powers the luck DESCRIPTION,
+# not the projection. Diffs are used within their own scoring scale, which
+# keeps them internally consistent. Data (c) ffverse/ffopportunity, GPL-3.
+EP_REL = "https://github.com/ffverse/ffopportunity/releases/download/latest-data"
+xfp = {}          # (gsis, yr) -> [actual_pts, expected_pts, games]
+for yr in seasons:
+    try:
+        rows = fetch_csv(f"{EP_REL}/ep_weekly_{yr}.csv")
+    except Exception as e:
+        log(f"  ep_weekly {yr}: unavailable ({e})")
+        continue
+    agg = {}
+    for r in rows:
+        gid = r.get("player_id")
+        if not gid:
+            continue
+        d = agg.setdefault(gid, [0.0, 0.0, set()])
+        d[0] += num(r.get("total_fantasy_points"))
+        d[1] += num(r.get("total_fantasy_points_exp"))
+        d[2].add(r.get("week"))
+    for gid, (a, e, wks) in agg.items():
+        if wks:
+            xfp[(gid, yr)] = (a, e, len(wks))
+    log(f"  ep_weekly {yr}: {len(agg)} players")
+
 # ---------- Sleeper index ----------
 sleeper = json.loads(fetch(SLEEPER_PLAYERS, 240))
 by_name = defaultdict(list)
@@ -178,6 +208,11 @@ for gid, pos in pos_of.items():
             "ts": round(s["ts_sum"] / g, 4), "wopr": round(s["wopr_sum"] / g, 3),
             "snp": round(sum(sn) / len(sn), 3) if sn else None,
         }
+        fx = xfp.get((gid, yr))
+        if fx and fx[2] > 0:
+            # per-game gap between what he scored and what his opportunities
+            # were worth, on ffopportunity's own scale
+            per_season[str(yr)]["fxd"] = round((fx[0] - fx[1]) / fx[2], 2)
     if not per_season:
         continue
     rec = {"pos": pos, "s": per_season}
