@@ -202,6 +202,7 @@ tr.taken td { opacity: .38; }
 .ti-val { display: block; font-weight: 700; margin-top: 2px; }
 .ti-arrow { font-size: 18px; color: var(--ink-muted); }
 .ti-why { font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+.ti-offer { margin-top: 8px; font-size: 12px; padding: 5px 10px; }
 @media (max-width: 640px) { .ti-body { flex-direction: column; align-items: stretch; }
   .ti-arrow { text-align: center; } }
 .verdict { margin-top: 16px; }
@@ -303,6 +304,11 @@ footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
   <div id="controls" class="controls hidden">
     <span id="leagueChips"></span>
     <span class="head-spacer"></span>
+    <span class="seg" id="planSeg" title="Your build. Re-prices every player against your goal, not the market's neutral blend.">
+      <button data-plan="contend">Contend</button>
+      <button data-plan="flexible" class="on">Flexible</button>
+      <button data-plan="rebuild">Rebuild</button>
+    </span>
     <span class="seg" id="modeSeg">
       <button data-mode="dynasty" class="on">Dynasty</button>
       <button data-mode="redraft">Redraft</button>
@@ -378,6 +384,8 @@ function demoRoute(url) {
   if (p === "/players/nfl") return DEMO.players;
   if (p.startsWith("/stats/nfl/")) return DEMO.stats || {};
   if (p.startsWith("/draft/")) return p.endsWith("/picks") ? [] : {};
+  if (p.endsWith("/traded_picks")) return [];
+  if (p.includes("/transactions/")) return [];
   if (p.includes("/trending/add")) return DEMO.trendingAdd;
   if (p.includes("/trending/drop")) return DEMO.trendingDrop;
   if (p.includes("/leagues/nfl/")) return p.endsWith(`/${DEMO.season}`) ? DEMO.leagues : [];
@@ -953,6 +961,125 @@ function riskRead(id) {
       `his peers'. Players who crash out of the data entirely stop reporting, so every drawdown here is a floor, not a ceiling.` };
 }
 
+/* Rookie picks, priced on the same scale as players. DynastyProcess prices
+   picks as ECR ranks; walking the live FantasyCalc value-vs-overall-rank curve
+   converts a rank into value units, so "2027 Mid 1st" and a player can sit in
+   the same trade column and mean the same thing. A pick-poor team cannot
+   afford to price its scarcest asset by feel. */
+function valueAtRank(rank) {
+  if (!S.rankCurve) {
+    S.rankCurve = Object.values(S.values)
+      .filter(e => e.v > 0 && e.ovr != null)
+      .sort((a, b) => a.ovr - b.ovr).map(e => [e.ovr, e.v]);
+  }
+  const c = S.rankCurve;
+  if (!c.length) return 0;
+  if (rank <= c[0][0]) return c[0][1];
+  for (let i = 1; i < c.length; i++)
+    if (c[i][0] >= rank) {
+      const [r0, v0] = c[i-1], [r1, v1] = c[i];
+      return Math.round(v0 + (v1 - v0) * (rank - r0) / Math.max(1, r1 - r0));
+    }
+  return c[c.length - 1][1];
+}
+function pickPrice(season, round) {
+  const picks = S.sigMeta?.picks;
+  if (!picks) return null;
+  const key = leagueFormat().numQbs === 2 ? "e2" : "e1";
+  const ord = ["1st","2nd","3rd","4th"][round - 1];
+  // Next year's picks carry Early/Mid/Late tiers; the year after is one flat
+  // asset per round. Try tiered first, fall back to flat.
+  for (const name of [`${season} Mid ${ord}`, `${season} ${ord}`]) {
+    const p = picks[name];
+    if (p) return { name, v: valueAtRank(p[key]), ecr: p[key] };
+  }
+  return null;
+}
+/* Who owns which future picks: everyone owns their own, then traded_picks
+   reassigns. Slots are unknown before standings exist, so everything prices
+   at the Mid tier — stated, not hidden. */
+function pickOwnership() {
+  const cur = Number(S.league?.season || S.season);
+  const rounds = Math.min(4, S.league?.settings?.draft_rounds || 4);
+  const own = {};
+  for (const r of S.rosters) {
+    own[r.roster_id] = [];
+    for (let y = cur + 1; y <= cur + 3; y++)
+      for (let rd = 1; rd <= rounds; rd++)
+        own[r.roster_id].push({ season: String(y), round: rd, orig: r.roster_id });
+  }
+  for (const t of (S.tradedPicks || [])) {
+    const y = Number(t.season), rd = t.round;
+    if (y <= cur) continue;
+    const from = own[t.roster_id];        // original owner's slot
+    if (!from) continue;
+    const i = from.findIndex(p => p.season === String(y) && p.round === rd && p.orig === t.roster_id);
+    if (i >= 0) {
+      const [pk] = from.splice(i, 1);
+      (own[t.owner_id] ||= []).push(pk);
+    }
+  }
+  return own;
+}
+function pickAsset(pk) {
+  const pr = pickPrice(pk.season, pk.round);
+  if (!pr) return null;
+  const ord = ["1st","2nd","3rd","4th"][pk.round - 1];
+  return { kind: "pick", id: `pk_${pk.season}_${pk.round}_${pk.orig}`,
+    name: `${pk.season} ${ord}` + (pk.orig !== undefined ? ` (${teamName(pk.orig)})` : ""),
+    pos: "PICK", v: pr.v };
+}
+
+/* The plan dial. A dynasty price is a blend of this season and the seasons
+   after it; FantasyCalc publishes both halves (redraft value = now, dynasty
+   value ≈ the blend), so the future half is recoverable as max(0, 2·dyn − re).
+   planValue reweights the two halves by YOUR declared build instead of the
+   market's neutral mix. Not a prediction — a re-pricing of known numbers
+   against a stated goal, and the model is simple enough to argue with. */
+const PLANS = {
+  contend:  { w: 0.75, label: "Contend now",   why: "this season weighted 3:1 over the future" },
+  flexible: { w: 0.50, label: "Stay flexible", why: "the market's own even blend" },
+  rebuild:  { w: 0.25, label: "Youth rebuild", why: "the future weighted 3:1 over this season" },
+};
+function planValue(id) {
+  const e = S.values[id];
+  if (!e || !e.v) return null;
+  const now = e.rv || 0;
+  const future = Math.max(0, 2 * e.v - now);
+  const w = (PLANS[S.plan] || PLANS.flexible).w;
+  return Math.round(w * now + (1 - w) * future) * 2 / 2;
+}
+function planRead(id) {
+  const pv = planValue(id), e = S.values[id];
+  if (pv == null || !e.v || S.plan === "flexible") return null;
+  const d = (pv - e.v) / e.v;
+  if (Math.abs(d) < 0.12) return null;
+  const p = PLANS[S.plan];
+  return { pv, d, txt: (d > 0 ? "+" : "") + Math.round(d * 100) + "% to plan",
+    cls: d > 0 ? "buy" : "sell",
+    why: `Worth ${fmt(pv)} to a "${p.label}" build (${p.why}) against a market price of ${fmt(e.v)} — ` +
+      (d > 0 ? "your plan values him above the market; that spread is what you shop for."
+             : "your plan values him below his price; someone else should pay it.") };
+}
+
+/* This week's depth-chart movement — the freshest signal in the app. A rank
+   that rose, or a team change, days before the market reprices it. */
+function depthDelta(id) {
+  const dc = S.sig?.[id]?.dc;
+  if (!dc?.prev) return null;
+  const moved = dc.prev.team !== dc.team;
+  const rose = !moved && dc.prev.rank > dc.rank;
+  const cleared = rose && dc.rank <= 2 && dc.prev.rank >= 3;
+  if (moved) return { cls: "hold", txt: "NEW TEAM", big: true,
+    why: `Moved from ${dc.prev.team} to ${dc.team} this week — a new depth chart and a new price question.` };
+  if (cleared) return { cls: "diamond", txt: `PATH ↑ ${dc.pos}${dc.rank}`, big: true,
+    why: `Climbed from ${dc.pos}${dc.prev.rank} to ${dc.pos}${dc.rank} on ${dc.team} within the last week. A path just cleared, and the market usually takes days to notice.` };
+  if (rose) return { cls: "buy", txt: `↑ ${dc.pos}${dc.prev.rank}→${dc.rank}`, big: false,
+    why: `Rose ${dc.pos}${dc.prev.rank} to ${dc.pos}${dc.rank} on ${dc.team} this week.` };
+  return { cls: "sell", txt: `↓ ${dc.pos}${dc.prev.rank}→${dc.rank}`, big: false,
+    why: `Fell ${dc.pos}${dc.prev.rank} to ${dc.pos}${dc.rank} on ${dc.team} this week.` };
+}
+
 /* The market's explicit price for youth: redraft value (this season only) over
    dynasty value (the career). The ratio itself is a fact, not a theory — both
    numbers come from the same trade market. What's only SUGGESTIVE is the
@@ -978,8 +1105,10 @@ function fullRead(id, extra) {
   const o = opportunity(id), l = luckRead(id), t = usageTrend(id),
         a = ageRead(id), d = draftRead(id), ph = postHype(id),
         pj = projection(id), ms = marketSplit(id), sc = successionRead(id),
-        rk = riskRead(id), at = ageTax(id);
+        rk = riskRead(id), at = ageTax(id), dd = depthDelta(id),
+        pl = planRead(id);
   push(edgeTag(id).why);
+  if (dd && dd.big) push(dd.why);         // freshest first — this week's news leads
   if (pj) push(pj.why);
   if (ms && ms.dir !== "agree") push(ms.why);
   if (o) push(o.why);
@@ -992,6 +1121,8 @@ function fullRead(id, extra) {
   if (sc) push(sc.why);
   if (rk && rk.cls !== "hold") push(rk.why);
   if (at) push(at.why);
+  if (dd && !dd.big) push(dd.why);
+  if (pl) push(pl.why);
   (extra || []).forEach(push);
   return `<div class="tt-title">${esc(name)}</div>` + parts.join("");
 }
@@ -1185,10 +1316,30 @@ function generateTradeIdeas() {
   const needs = leagueNeeds();
   const myArch = teamArchetype(S.myRosterId, teams);
   const ideas = [];
+  const own = pickOwnership();
+  // If a package is close but light on one side, a future pick is the natural
+  // balancer — it's how real dynasty deals actually clear.
+  const sweeten = (pkg, myRid, oppRid) => {
+    const gap = pkg.tv - pkg.gv;                     // positive: I owe value
+    if (Math.abs(gap) / Math.max(pkg.gv, pkg.tv) < 0.06) return pkg;
+    const fromRid = gap > 0 ? myRid : oppRid;
+    const picks = (own[fromRid] || []).map(pickAsset).filter(Boolean)
+      .sort((a, b) => Math.abs(Math.abs(gap) - a.v) - Math.abs(Math.abs(gap) - b.v));
+    const pk = picks[0];
+    if (!pk || pk.v > Math.abs(gap) * 2.2) return pkg;
+    const give = gap > 0 ? [...pkg.give, pk] : pkg.give;
+    const get = gap > 0 ? pkg.get : [...pkg.get, pk];
+    const gv = give.reduce((s, x) => s + x.v, 0), tv = get.reduce((s, x) => s + x.v, 0);
+    const fair = 1 - Math.abs(gv - tv) / Math.max(gv, tv);
+    if (fair <= pkg.fair + 0.03) return pkg;
+    return { ...pkg, give, get, gv, tv, fair, sweetened: pk.name,
+      s: pkg.s + (fair - pkg.fair) * 1000 };
+  };
   for (const t of teams) {
     if (t.rid === S.myRosterId) continue;
     if (!(t.roster.players || []).length) continue;    // nothing to trade for
-    const pkg = bestPackage(S.myRosterId, t.rid, needs);
+    let pkg = bestPackage(S.myRosterId, t.rid, needs);
+    if (pkg) pkg = sweeten(pkg, S.myRosterId, t.rid);
     if (pkg) ideas.push({ oppRid: t.rid, oppName: t.name,
       oppArch: teamArchetype(t.rid, teams), ...pkg });
   }
@@ -1346,6 +1497,48 @@ function renderRosters(v) {
     }
   }
   tbl.append(tb); card.append(tbl); v.append(card);
+
+  // ---- construction grade: the shape of the roster, not the sum of it ----
+  // A team can have good total value and still be built wrong: all its WR
+  // value aging out together, or half its price in FRAGILE assets. This is
+  // the portfolio view of the team selected above.
+  const ids = (t.roster.players || []).filter(id => id && id !== "0" && GROUPS.includes(pinfo(id).p));
+  if (ids.length) {
+    const gc = el("div", "card");
+    gc.append(el("h2", null, "Construction grade"),
+      el("div", "sub", `How ${esc(t.name)} is built — value-weighted age by position, value past the age cliff, and price-path risk.`));
+    const notes = [];
+    const rowsHtml = [];
+    for (const g of GROUPS) {
+      const gp = ids.filter(id => pinfo(id).p === g && val(id) > 0);
+      if (!gp.length) { rowsHtml.push(`<tr><td>${g}</td><td colspan="4" style="color:var(--ink-muted)">no value held</td></tr>`); continue; }
+      const tot = gp.reduce((s,id) => s + val(id), 0);
+      let w = 0, cliffV = 0, fragile = 0;
+      for (const id of gp) {
+        const a = pinfo(id).a, vv = val(id);
+        if (a) { w += a * vv;
+          const c = CURVES[g];
+          if (c && a >= c.cliff - 1) cliffV += vv; }
+        if (riskRead(id)?.txt === "FRAGILE") fragile++;
+      }
+      const avgAge = w / tot;
+      const cliffPct = cliffV / tot * 100;
+      rowsHtml.push(`<tr><td>${g}</td><td class="num">${fmt(tot)}</td>
+        <td class="num">${avgAge ? avgAge.toFixed(1) : "—"}</td>
+        <td class="num"><span class="${cliffPct > 40 ? "edge-neg" : ""}">${cliffPct.toFixed(0)}%</span></td>
+        <td class="num">${fragile}</td></tr>`);
+      if (cliffPct > 40) notes.push(`${cliffPct.toFixed(0)}% of the ${g} value is at or near the age cliff — that value is on a timer, and it all expires together.`);
+      if (fragile >= 2) notes.push(`${fragile} FRAGILE assets at ${g} — price paths choppier than their peers'. One bad month hits them all at once.`);
+    }
+    const gt = el("table");
+    gt.innerHTML = `<thead><tr><th>Pos</th><th class="num">Value held</th><th class="num">Wtd age</th>
+      <th class="num">Near cliff</th><th class="num">Fragile</th></tr></thead><tbody>${rowsHtml.join("")}</tbody>`;
+    gc.append(gt);
+    gc.append(el("div", "sub", notes.length
+      ? notes.map(n => "⚠ " + esc(n)).join("<br>")
+      : "No structural warnings — value is spread across ages and risk tiers."));
+    v.append(gc);
+  }
 }
 
 /* ---------- trade calculator ---------- */
@@ -1447,6 +1640,49 @@ function renderTrade(v) {
       `</span>`));
   }
   v.append(card);
+
+  // The consequence, not just the fairness: simulate the swap on YOUR actual
+  // roster and show what changes. Only when both sides map to teams and your
+  // team is one of them — a hypothetical between two other teams isn't yours.
+  const tA = S.tradeTeam?.a, tB = S.tradeTeam?.b;
+  const mine = tA === S.myRosterId ? "a" : tB === S.myRosterId ? "b" : null;
+  const other = mine === "a" ? tB : mine === "b" ? tA : null;
+  if (mine && other != null && (S.trade.a.length || S.trade.b.length)) {
+    const outIds = S.trade[mine].filter(x => x.kind === "player").map(x => x.id);
+    const inIds = S.trade[mine === "a" ? "b" : "a"].filter(x => x.kind === "player").map(x => x.id);
+    if (outIds.length || inIds.length) {
+      const myRoster = S.rosters.find(r => r.roster_id === S.myRosterId);
+      const before = { total: 0, starters: starterValue(myRoster) };
+      const beforeIds = (myRoster.players || []).slice();
+      before.total = beforeIds.reduce((s, id) => s + val(id), 0);
+      const planBefore = beforeIds.reduce((s, id) => s + (planValue(id) ?? val(id)), 0);
+      // simulate
+      myRoster.players = beforeIds.filter(id => !outIds.includes(id)).concat(inIds);
+      const after = { total: myRoster.players.reduce((s, id) => s + val(id), 0),
+                      starters: starterValue(myRoster) };
+      const planAfter = myRoster.players.reduce((s, id) => s + (planValue(id) ?? val(id)), 0);
+      const ages = (ids) => { let w = 0, vsum = 0;
+        for (const id of ids) { const a = pinfo(id).a, vv = val(id);
+          if (a && vv) { w += a * vv; vsum += vv; } }
+        return vsum ? w / vsum : null; };
+      const ageB = ages(beforeIds), ageA = ages(myRoster.players);
+      myRoster.players = beforeIds;                        // restore, always
+      const delta = (a, b, unit="") => { const d = a - b;
+        return `<span class="${d > 0 ? "edge-pos" : d < 0 ? "edge-neg" : ""}">${d > 0 ? "+" : ""}${typeof d === "number" && unit === "y" ? d.toFixed(1) : fmt(d)}${unit === "y" ? " yrs" : ""}</span>`; };
+      const sc = el("div", "card");
+      sc.append(el("h2", null, "If you make this trade"),
+        el("div", "sub", `Your roster after the swap, against the "${(PLANS[S.plan]||PLANS.flexible).label}" plan. Picks change your capital but not these lineup numbers.`));
+      const rowdiv = el("div", "statrow");
+      rowdiv.append(
+        statTile("Starting lineup", fmt(after.starters), `was ${fmt(before.starters)} · ${delta(after.starters, before.starters)}`),
+        statTile("Total roster value", fmt(after.total), `was ${fmt(before.total)} · ${delta(after.total, before.total)}`),
+        statTile("Plan-adjusted value", fmt(planAfter), `was ${fmt(planBefore)} · ${delta(planAfter, planBefore)}`),
+        statTile("Value-weighted age", ageA ? ageA.toFixed(1) : "—",
+          ageB && ageA ? `was ${ageB.toFixed(1)} · ${delta(ageA, ageB, "y")}` : ""));
+      sc.append(rowdiv);
+      v.append(sc);
+    }
+  }
 }
 function tradeSide(side, label, pool) {
   const box = el("div", "tside");
@@ -1494,8 +1730,11 @@ function tradeSide(side, label, pool) {
     const t = teams.find(x => x.rid === rid);
     const taken = new Set([...S.trade.a, ...S.trade.b].map(x => x.id));
     const list = el("div", "tpick");
+    const own = pickOwnership()[rid] || [];
+    const pickRows = own.map(pickAsset).filter(Boolean).filter(a => !taken.has(a.id))
+      .sort((a,b) => b.v - a.v);
     const assets = (t?.assets || []).filter(a => !taken.has(a.id));
-    if (!assets.length) {
+    if (!assets.length && !pickRows.length) {
       list.append(el("div", "empty",
         (t?.assets || []).length ? "Everything here is already in the trade."
           : `${t?.name || "This team"} has no players yet — the league hasn't drafted.`));
@@ -1507,6 +1746,14 @@ function tradeSide(side, label, pool) {
           S.trade[side].push({ kind: "player", id: a.id, name: a.name, pos: a.pos, v: a.v,
             owner: t.name }); render();
         });
+        list.append(b);
+      }
+      // The team's future picks, priced at the Mid tier (slots unknown until
+      // standings exist). For a pick-poor team these rows ARE the negotiation.
+      for (const a of pickRows) {
+        const b = el("button", null,
+          `<span class="posbadge">PICK</span> ${esc(a.name)}<span class="sv">${fmt(a.v)}</span>`);
+        b.addEventListener("click", () => { S.trade[side].push({ ...a, owner: t.name }); render(); });
         list.append(b);
       }
     }
@@ -1678,7 +1925,7 @@ function renderDraftInner(v) {
   const tbl = el("table");
   tbl.innerHTML = `<thead><tr><th>#</th><th>Player</th><th class="num">Age</th>
     <th class="num">Proj</th><th class="num">VOR</th><th class="num">Value</th>
-    <th>Age tax</th><th>Reads</th><th>Status</th></tr></thead>`;
+    <th class="num">Plan</th><th>Age tax</th><th>Reads</th><th>Status</th></tr></thead>`;
   const tb = el("tbody");
   const shown = rows.slice(0, 140);
   let lastVor = null, rank = 0;
@@ -1688,7 +1935,7 @@ function renderDraftInner(v) {
     // positions interleave, so a gap between consecutive rows says nothing
     // about any position's actual cliff.
     if (S.faPos !== "ALL" && lastVor != null && r.vor != null && lastVor - r.vor >= 1.0)
-      tb.append(el("tr", null, `<td class="gh" colspan="9">— tier break: ${(lastVor - r.vor).toFixed(1)} ppg drop —</td>`));
+      tb.append(el("tr", null, `<td class="gh" colspan="10">— tier break: ${(lastVor - r.vor).toFixed(1)} ppg drop —</td>`));
     if (r.vor != null) lastVor = r.vor;
     const at = ageTax(r.id), tag = edgeTag(r.id), sc = successionRead(r.id);
     const readBits = [];
@@ -1702,6 +1949,9 @@ function renderDraftInner(v) {
        <td class="num">${r.proj != null ? r.proj.toFixed(1) : "—"}</td>
        <td class="num">${r.vor != null ? `<b class="${r.vor > 0 ? "edge-pos" : ""}">${r.vor > 0 ? "+" : ""}${r.vor.toFixed(1)}</b>` : "—"}</td>
        <td class="num">${r.v ? fmt(r.v) : "—"}</td>
+       <td class="num">${(() => { const pv = planValue(r.id); if (pv == null || !r.v) return "—";
+          const d = (pv - r.v) / r.v;
+          return `<span class="${d > 0.12 ? "edge-pos" : d < -0.12 ? "edge-neg" : ""}">${fmt(pv)}</span>`; })()}</td>
        <td>${at ? `<span class="tag ${at.cls}">${esc(at.txt)}</span>` : ""}</td>
        <td>${readBits.join(" ")}</td>
        <td>${r.pk ? `<span class="tag sell">R${r.pk.round} · ${esc(userByRid.get(r.pk.by) || "taken")}</span>`
@@ -1717,8 +1967,62 @@ function renderDraftInner(v) {
   v.append(card);
 }
 
+/* ---------- manager profiles ---------- */
+/* Who actually picks up the phone. Sleeper exposes every transaction; a
+   manager's history says whether an offer to them is a conversation or a
+   message into the void. Covers this league and, when the league renews, the
+   season before it — a brand-new league honestly has no history yet. */
+async function loadManagerProfiles() {
+  const prof = {};
+  for (const r of S.rosters) prof[r.roster_id] = { trades: 0, moves: 0, partners: {} };
+  const harvest = async (lid, ridMap) => {
+    const weeks = await Promise.all(Array.from({ length: 18 }, (_, i) =>
+      sleeper(`/league/${lid}/transactions/${i + 1}`).catch(() => [])));
+    for (const wk of weeks) for (const tx of (wk || [])) {
+      if (tx.status !== "complete") continue;
+      const rids = (tx.roster_ids || []).map(rid => ridMap ? ridMap[rid] : rid).filter(rid => prof[rid]);
+      if (tx.type === "trade" && rids.length >= 2) {
+        for (const rid of rids) {
+          prof[rid].trades++;
+          for (const other of rids) if (other !== rid)
+            prof[rid].partners[other] = (prof[rid].partners[other] || 0) + 1;
+        }
+      } else if (rids.length) {
+        for (const rid of rids) prof[rid].moves++;
+      }
+    }
+  };
+  try {
+    await harvest(S.league.league_id, null);
+    if (S.league.previous_league_id) {
+      // Map last season's roster ids to this season's via the owning user.
+      const prevRosters = await sleeper(`/league/${S.league.previous_league_id}/rosters`) || [];
+      const ownerToCur = {};
+      for (const r of S.rosters) ownerToCur[r.owner_id] = r.roster_id;
+      const ridMap = {};
+      for (const r of prevRosters) if (ownerToCur[r.owner_id] != null)
+        ridMap[r.roster_id] = ownerToCur[r.owner_id];
+      await harvest(S.league.previous_league_id, ridMap);
+    }
+  } catch {}
+  S.mgr = prof;
+  S.mgrLoaded = S.league?.league_id;
+}
+function mgrRead(rid) {
+  const m = S.mgr?.[rid];
+  if (!m) return null;
+  if (!m.trades && !m.moves) return { cls: "nosample", txt: "NO HISTORY",
+    why: "No completed transactions on record — either a brand-new league or a manager who never touches the roster." };
+  if (m.trades >= 3) return { cls: "buy", txt: `TRADES (${m.trades})`,
+    why: `${m.trades} completed trades on record — this manager actually deals. Worth the call.` };
+  if (m.trades >= 1) return { cls: "hold", txt: `${m.trades} TRADE${m.trades > 1 ? "S" : ""}`,
+    why: `${m.trades} completed trade${m.trades > 1 ? "s" : ""} on record.` };
+  return { cls: "sell", txt: "NEVER TRADES",
+    why: `${m.moves} roster moves but zero trades on record — expect silence, lead with your simplest offer.` };
+}
+
 /* ---------- trade finder ---------- */
-function pkgLine(ids) { return ids.map(x => `${x.pos} ${S.values[x.id]?.name || pinfo(x.id).n}`).join(" + "); }
+function pkgLine(ids) { return ids.map(x => x.kind === "pick" ? x.name : `${x.pos} ${S.values[x.id]?.name || pinfo(x.id).n}`).join(" + "); }
 function renderTradeFinder(v) {
   if (!S.myRosterId) {
     v.append(el("div", "card"), el("div", "empty", "Couldn't find your roster in this league."));
@@ -1733,6 +2037,17 @@ function renderTradeFinder(v) {
         "Trade Finder needs real rosters to compare needs against; it has nothing to work with until then. " +
         "The engine itself is live and already checked every other team in this league — there's just nobody on them."));
     v.append(card); return;
+  }
+  if (S.mgrLoaded !== S.league?.league_id) {
+    // Guarded start: never latch onto an empty roster list (an early render
+    // during boot would profile zero managers and cache it), and never fire
+    // twice for the same league while a load is already in flight.
+    if (S.rosters.length && S.mgrLoadingFor !== S.league?.league_id) {
+      S.mgrLoadingFor = S.league?.league_id;
+      loadManagerProfiles().then(() => { if (S.tab === "tradefinder") render(); });
+    }
+    v.append(el("div", "status", '<span class="spin"></span>Reading league history…'));
+    return;
   }
   const { ideas, myArch, teams } = generateTradeIdeas();
   const stats = el("div", "statrow");
@@ -1757,9 +2072,11 @@ function renderTradeFinder(v) {
   for (const idea of ideas.slice(0, 10)) {
     const box = el("div", "trade-idea");
     const hdr = el("div", "ti-hdr");
+    const mg = mgrRead(idea.oppRid);
     hdr.append(el("span", "ti-vs", `vs ${esc(idea.oppName)}`),
       idea.oppArch ? el("span", `tag ${idea.oppArch.cls === "contender" ? "buy" : idea.oppArch.cls === "rebuilder" ? "sell" : "hold"}`,
         idea.oppArch.cls.toUpperCase()) : null,
+      mg ? el("span", `tag ${mg.cls}`, esc(mg.txt)) : null,
       el("span", "ti-fair", `${(idea.fair*100).toFixed(0)}% value match`));
     box.append(hdr);
     const body = el("div", "ti-body");
@@ -1780,7 +2097,42 @@ function renderTradeFinder(v) {
         idea.oppArch.cls === "rebuilder" ? "rebuilding teams want the pieces you're sending, not the ones you're asking for." :
         "not clearly buying or selling, so fit matters more than saying no."}`));
     box.append(why);
-    const html = idea.get.concat(idea.give).map(x => fullRead(x.id)).join("<hr style='border-color:var(--grid);margin:8px 0'>");
+    // The pitch, written for the OTHER manager: what they get and why it helps
+    // their build. Analysis that never becomes a sent message is a spreadsheet.
+    const offerBtn = el("button", "btn ghost ti-offer", "✉ Write the offer");
+    offerBtn.addEventListener("click", ev => {
+      ev.stopPropagation();
+      // Package assets carry ids, not names — resolve the same way pkgLine does.
+      const nameOf = x => x.kind === "pick" ? x.name : (S.values[x.id]?.name || pinfo(x.id).n);
+      const them = idea.give.map(nameOf).join(" + ");
+      const me = idea.get.map(nameOf).join(" + ");
+      const hooks = idea.give.filter(x => x.kind !== "pick").map(x => {
+        const e = S.edges[x.id], o = opportunity(x.id);
+        if (o && ["elite","strong"].includes(o.tier)) return `${nameOf(x)} ${o.why.split(",")[0]}`;
+        if (e?.prodRank) return `${nameOf(x)} finished ${e.pos}${e.prodRank} in adjusted production`;
+        return null;
+      }).filter(Boolean).slice(0, 2);
+      const arch = idea.oppArch?.cls;
+      const angle = arch === "contender"
+        ? "You're built to win now, and this adds to your starting lineup immediately."
+        : arch === "rebuilder"
+        ? "You're building for later, and this sends you the younger, longer pieces."
+        : "Value's close to dead even, so it comes down to fit — and this fits both of us.";
+      const pitch = `Hey — would you do ${them} for ${me}?\n\n` +
+        (hooks.length ? hooks.join(". ") + ". " : "") + angle +
+        `\n\nBy market values it's ${(idea.fair*100).toFixed(0)}% even` +
+        (idea.sweetened ? ` (threw in the ${idea.sweetened} to square it up)` : "") + `. Open to tweaks.`;
+      showTT(`<div class="tt-title">Offer for ${esc(idea.oppName)}</div>` +
+        `<div class="tt-row"><span style="white-space:pre-wrap">${esc(pitch)}</span></div>` +
+        `<button class="btn" id="copyOffer" style="margin-top:8px">Copy to clipboard</button>`, ev);
+      document.getElementById("copyOffer")?.addEventListener("click", () => {
+        navigator.clipboard?.writeText(pitch).then(() => {
+          document.getElementById("copyOffer").textContent = "Copied ✓";
+        });
+      });
+    });
+    box.append(offerBtn);
+    const html = idea.get.concat(idea.give).filter(x => x.kind !== "pick").map(x => fullRead(x.id)).join("<hr style='border-color:var(--grid);margin:8px 0'>");
     box.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
     card.append(box);
   }
@@ -1809,6 +2161,27 @@ function renderDevBoard(v, owner) {
     statTile("Depth charts as of", S.sigMeta?.built ? esc(S.sigMeta.built) : "—", "ESPN via nflverse, refreshed ~daily"),
     statTile("Needs a fantasy roster?", "No", "this reads NFL depth charts, not your league"));
   v.append(stats);
+
+  // This week's depth movement, freshest first. Not filtered to succession
+  // candidates: an incumbent FALLING is exactly what clears a path.
+  const movers = Object.keys(S.sig || {})
+    .map(id => ({ id, dd: depthDelta(id) }))
+    .filter(x => x.dd && (S.boardPos === "ALL" || S.sig[x.id].pos === S.boardPos))
+    .sort((a,b) => (b.dd.big ? 1 : 0) - (a.dd.big ? 1 : 0));
+  if (movers.length) {
+    const mc = el("div", "card");
+    mc.append(el("h2", null, "This week's path changes"),
+      el("div", "sub", "Depth-chart moves in the last ~7 days — the market usually takes days to reprice these."));
+    const wrap = el("div", "sig-chips");
+    for (const m of movers.slice(0, 20)) {
+      const chip = el("button", `tag ${m.dd.cls}`,
+        `${esc(S.values[m.id]?.name || pinfo(m.id).n)} ${esc(m.dd.txt)}`);
+      chip.addEventListener("click", ev => { showTT(fullRead(m.id), ev); ev.stopPropagation(); });
+      wrap.append(chip);
+    }
+    mc.append(wrap);
+    v.append(mc);
+  }
 
   const card = el("div", "card");
   card.append(el("h2", null, "Development candidates"),
@@ -2161,10 +2534,12 @@ async function pickLeague(league) {
   });
   try {
     setStatus(`Loading ${league.name}…`);
-    const [rosters, lusers] = await Promise.all([
+    const [rosters, lusers, tpicks] = await Promise.all([
       sleeper(`/league/${league.league_id}/rosters`),
-      sleeper(`/league/${league.league_id}/users`)]);
-    S.rosters = rosters || []; S.lusers = lusers || [];
+      sleeper(`/league/${league.league_id}/users`),
+      sleeper(`/league/${league.league_id}/traded_picks`).catch(() => [])]);
+    S.rosters = rosters || []; S.lusers = lusers || []; S.tradedPicks = tpicks || [];
+    S.rankCurve = null;
     const mine = S.rosters.find(r =>
       r.owner_id === S.user.user_id || (r.co_owners || []).includes(S.user.user_id));
     S.myRosterId = mine ? mine.roster_id : null;
@@ -2204,6 +2579,14 @@ async function pickLeague(league) {
 document.addEventListener("click", hideTT);   // tap anywhere to dismiss a pinned tooltip
 document.querySelectorAll("nav.tabs button").forEach(b =>
   b.addEventListener("click", () => { S.tab = b.dataset.tab; render(); }));
+$("#planSeg").querySelectorAll("button").forEach(b =>
+  b.addEventListener("click", () => {
+    S.plan = b.dataset.plan;
+    remember("wc_plan", S.plan);
+    $("#planSeg").querySelectorAll("button").forEach(x =>
+      x.classList.toggle("on", x === b));
+    render();
+  }));
 $("#modeSeg").querySelectorAll("button").forEach(b =>
   b.addEventListener("click", async () => {
     if (S.mode === b.dataset.mode) return;
@@ -2230,6 +2613,9 @@ $("#themeBtn").addEventListener("click", () => {
 });
 
 (function boot() {
+  S.plan = recall("wc_plan") || "flexible";
+  document.querySelectorAll("#planSeg button").forEach(b =>
+    b.classList.toggle("on", b.dataset.plan === S.plan));
   const savedTheme = recall("wc_theme");
   if (savedTheme) document.documentElement.dataset.theme = savedTheme;
   const qs = new URLSearchParams(location.search);

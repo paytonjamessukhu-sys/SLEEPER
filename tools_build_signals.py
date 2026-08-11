@@ -146,25 +146,50 @@ for r in fetch_csv(f"{REL}/draft_picks/draft_picks.csv"):
 # preseason). Updated ~daily by ESPN via nflverse; only the most recent
 # snapshot in the file is used.
 TEAM_ALIAS = {"LA": "LAR"}   # ESPN's depth chart says LA; Sleeper and everyone else say LAR
-depth = {}   # gsis -> {team, rank}
+depth = {}   # gsis -> {team, rank, and last week's rank when it differs}
 try:
     rows = fetch_csv(f"{REL}/depth_charts/depth_charts_{cur}.csv")
-    latest_dt = max((r["dt"] for r in rows if r.get("dt")), default=None)
-    n = 0
-    for r in rows:
-        if r.get("dt") != latest_dt or r.get("pos_abb") not in POS:
-            continue
-        gid = (r.get("gsis_id") or "").strip()
-        if not gid or not (r.get("player_name") or "").strip():
-            continue
-        try:
-            rank = int(r.get("pos_rank"))
-        except (TypeError, ValueError):
-            continue
-        team = r.get("team")
-        depth[gid] = {"team": TEAM_ALIAS.get(team, team), "pos": r.get("pos_abb"), "rank": rank}
-        n += 1
-    log(f"  depth_charts {cur}: {n} skill players, snapshot {latest_dt}")
+    all_dts = sorted({r["dt"] for r in rows if r.get("dt")})
+    latest_dt = all_dts[-1] if all_dts else None
+    # The same file carries months of dated snapshots, so the week-over-week
+    # change is free: pick the newest snapshot at least 6 days older. A rank
+    # that ROSE this week — or an incumbent who vanished — is the "his path
+    # just cleared" moment, and it's worth more the fresher it is.
+    import datetime as _dt
+    prev_dt = None
+    if latest_dt:
+        cutoff = (_dt.datetime.fromisoformat(latest_dt.replace("Z", ""))
+                  - _dt.timedelta(days=6)).isoformat()
+        older = [d for d in all_dts if d.replace("Z", "") <= cutoff]
+        prev_dt = older[-1] if older else None
+
+    def snap_of(dt):
+        out = {}
+        for r in rows:
+            if r.get("dt") != dt or r.get("pos_abb") not in POS:
+                continue
+            gid = (r.get("gsis_id") or "").strip()
+            if not gid or not (r.get("player_name") or "").strip():
+                continue
+            try:
+                rank = int(r.get("pos_rank"))
+            except (TypeError, ValueError):
+                continue
+            team = r.get("team")
+            out[gid] = {"team": TEAM_ALIAS.get(team, team),
+                        "pos": r.get("pos_abb"), "rank": rank}
+        return out
+
+    depth = snap_of(latest_dt)
+    prev = snap_of(prev_dt) if prev_dt else {}
+    moved = 0
+    for gid, d in depth.items():
+        p = prev.get(gid)
+        if p and (p["rank"] != d["rank"] or p["team"] != d["team"]):
+            d["prev"] = {"rank": p["rank"], "team": p["team"]}
+            moved += 1
+    log(f"  depth_charts {cur}: {len(depth)} skill players, snapshot {latest_dt}, "
+        f"vs {prev_dt or 'n/a'}: {moved} moved")
 except Exception as e:
     log(f"  depth_charts {cur}: unavailable ({e})")
 
@@ -307,6 +332,21 @@ except Exception as e:
     dp_date = None
     log(f"second market unavailable ({e})")
 
+# ---------- rookie pick prices ----------
+# DynastyProcess prices picks as ECR ranks (rank among all dynasty assets).
+# Baked raw; the app converts rank to a FantasyCalc-scale value through the
+# live value-vs-overall-rank curve, so picks and players price in one unit.
+dp_picks = {}
+try:
+    for r in fetch_csv("https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-picks.csv"):
+        n = (r.get("player") or "").strip()
+        e1, e2 = num(r.get("ecr_1qb")), num(r.get("ecr_2qb"))
+        if n and e1 > 0:
+            dp_picks[n] = {"e1": round(e1, 1), "e2": round(e2, 1)}
+    log(f"pick prices: {len(dp_picks)} pick assets from DynastyProcess")
+except Exception as e:
+    log(f"pick prices unavailable ({e})")
+
 # ---------- projection ----------
 # A ridge regression on last season's line, fit here and baked in. Written
 # against the standard library on purpose so the refresh workflow needs no
@@ -418,6 +458,7 @@ meta = {"built": __import__("datetime").date.today().isoformat(),
         "join": "normalised name + position against Sleeper",
         "rookieClasses": sorted({d["yr"] for d in draft_by_name.values() if d["yr"] >= latest}),
         "model": proj_meta,
+        "picks": dp_picks or None,
         "market2": {"name": "DynastyProcess (FantasyPros consensus)", "date": dp_date,
                     "players": dp_added} if dp_added else None,
         # Measured on two independent one-year windows against DynastyProcess
