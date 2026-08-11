@@ -127,6 +127,7 @@ td { padding: 7px 8px; border-bottom: 1px solid var(--grid); font-size: 13px; }
 tr:last-child td { border-bottom: none; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr.me td { background: var(--accent-soft); }
+tr.taken td { opacity: .38; }
 .posgroup td.gh { font-size: 11px; font-weight: 700; color: var(--ink-muted);
   text-transform: uppercase; letter-spacing: .05em; padding-top: 14px; border-bottom: 1px solid var(--baseline); }
 .meter { display: inline-flex; align-items: center; gap: 8px; width: 100%; }
@@ -298,6 +299,7 @@ footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
   <nav class="tabs hidden" id="tabs">
     <button data-tab="power" class="on">Power Rankings</button>
     <button data-tab="rosters">Rosters</button>
+    <button data-tab="draft">Draft</button>
     <button data-tab="board">Buy / Sell Board</button>
     <button data-tab="tradefinder">Trade Finder</button>
     <button data-tab="trade">Trade Calculator</button>
@@ -359,6 +361,7 @@ function demoRoute(url) {
   if (p === "/state/nfl") return DEMO.state;
   if (p === "/players/nfl") return DEMO.players;
   if (p.startsWith("/stats/nfl/")) return DEMO.stats || {};
+  if (p.startsWith("/draft/")) return p.endsWith("/picks") ? [] : {};
   if (p.includes("/trending/add")) return DEMO.trendingAdd;
   if (p.includes("/trending/drop")) return DEMO.trendingDrop;
   if (p.includes("/leagues/nfl/")) return p.endsWith(`/${DEMO.season}`) ? DEMO.leagues : [];
@@ -438,7 +441,8 @@ async function loadValues() {
     S.source = "fantasycalc";
     for (const row of rows) {
       const sid = row?.player?.sleeperId;
-      const entry = { v: row.value || 0, ovr: row.overallRank ?? null,
+      const entry = { v: row.value || 0, rv: row.redraftValue || 0,
+        ovr: row.overallRank ?? null,
         pr: row.positionRank ?? null, tr: row.trend30Day ?? 0,
         pos: row?.player?.position || null, name: row?.player?.name || null };
       if (sid != null && sid !== "") S.values[String(sid)] = entry;
@@ -933,6 +937,22 @@ function riskRead(id) {
       `his peers'. Players who crash out of the data entirely stop reporting, so every drawdown here is a floor, not a ceiling.` };
 }
 
+/* The market's explicit price for youth: redraft value (this season only) over
+   dynasty value (the career). The ratio itself is a fact, not a theory — both
+   numbers come from the same trade market. What's only SUGGESTIVE is the
+   exploit: value-matched vets out-produced their dynasty price in all three
+   windows tested, but never past the permutation court (p 0.09-0.23). */
+function ageTax(id) {
+  const e = S.values[id];
+  if (!e || !e.v || !e.rv || e.v < 300) return null;
+  const ratio = e.rv / e.v;
+  if (ratio >= 1.15) return { cls: "buy", txt: "WIN-NOW +" + Math.round((ratio - 1) * 100) + "%", ratio,
+    why: `Worth ${Math.round((ratio - 1) * 100)}% more for this season alone than his full dynasty price — the market is discounting his future hard. In the three windows tested, vets priced like this out-produced their cost every time (though never past the chance bar), and for a team competing now the discount is the point.` };
+  if (ratio <= 0.65) return { cls: "sell", txt: "FUTURE " + Math.round((1 - ratio) * 100) + "%", ratio,
+    why: `${Math.round((1 - ratio) * 100)}% of his dynasty price is a bet on seasons he hasn't played yet — you're buying years, not points. Fine for a rebuild; expensive for a team trying to win now.` };
+  return null;
+}
+
 /* Everything the app knows about one player, as sentences. Assembled in one
    place so the board, the wire and the roster all explain themselves identically. */
 function fullRead(id, extra) {
@@ -942,7 +962,7 @@ function fullRead(id, extra) {
   const o = opportunity(id), l = luckRead(id), t = usageTrend(id),
         a = ageRead(id), d = draftRead(id), ph = postHype(id),
         pj = projection(id), ms = marketSplit(id), sc = successionRead(id),
-        rk = riskRead(id);
+        rk = riskRead(id), at = ageTax(id);
   push(edgeTag(id).why);
   if (pj) push(pj.why);
   if (ms && ms.dir !== "agree") push(ms.why);
@@ -955,6 +975,7 @@ function fullRead(id, extra) {
   if (ph) push(ph.why);
   if (sc) push(sc.why);
   if (rk && rk.cls !== "hold") push(rk.why);
+  if (at) push(at.why);
   (extra || []).forEach(push);
   return `<div class="tt-title">${esc(name)}</div>` + parts.join("");
 }
@@ -1183,7 +1204,7 @@ function render() {
   document.querySelectorAll("nav.tabs button").forEach(b =>
     b.classList.toggle("on", b.dataset.tab === S.tab));
   if (!S.league) return;
-  ({ power: renderPower, rosters: renderRosters, board: renderBoard,
+  ({ power: renderPower, rosters: renderRosters, draft: renderDraft, board: renderBoard,
      tradefinder: renderTradeFinder, trade: renderTrade, freeagents: renderFreeAgents,
      standings: renderStandings, market: renderMarket }[S.tab])(v);
 }
@@ -1482,6 +1503,7 @@ function evidenceNote() {
     " So use it to judge what a player will SCORE next season, not what the market will pay for him.");
   if (ev.projection) row("modest", ev.projection.claim);
   if (ev.marketShape) row("suggestive", ev.marketShape.claim);
+  if (ev.ageArb) row("suggestive", ev.ageArb.claim);
   // Composed from the risk file itself so the words can never drift from the data.
   const a = S.riskMeta?.arch;
   if (a?.RB_elite && a?.WR_elite) row("held",
@@ -1491,6 +1513,157 @@ function evidenceNote() {
     `and the same ordering holds one tier down. Only ${a.RB_elite.n} elite RBs exist, so the direction is solid and the magnitudes are soft. ` +
     `Even elite WRs median a ${(a.WR_elite.mdd_med*100).toFixed(0)}% slide inside two years — nothing in dynasty is actually safe.`);
   return box;
+}
+
+/* ---------- draft war room ---------- */
+/* Value over replacement, against THIS league's exact lineup. Replacement
+   level is what makes an 11-team 1QB league price players differently from
+   the 12-team superflex the big sites assume: the last startable QB here is
+   QB11, and everything above him is worth only what it clears that bar by.
+   Flex slots are split half RB / half WR — tight ends rarely win a flex spot
+   in practice; the assumption is stated here so it can be argued with. */
+function replacementLevels() {
+  const teams = S.league?.total_rosters || 11;
+  const slots = (S.league?.roster_positions || []).filter(s => !["BN","IR","TAXI"].includes(s));
+  const count = { QB:0, RB:0, WR:0, TE:0 };
+  for (const s of slots) {
+    if (count[s] !== undefined) count[s]++;
+    else if (POS_SLOTS[s]) {
+      if (s === "SUPER_FLEX") count.QB += 0.7, count.RB += 0.15, count.WR += 0.15;
+      else count.RB += 0.5, count.WR += 0.5;
+    }
+  }
+  const proj = {};
+  for (const [id, sg] of Object.entries(S.sig || {}))
+    if (sg.proj != null && GROUPS.includes(sg.pos)) (proj[sg.pos] ||= []).push(sg.proj);
+  const out = {};
+  for (const g of GROUPS) {
+    const n = Math.max(1, Math.round(teams * count[g]));
+    const arr = (proj[g] || []).sort((a,b) => b - a);
+    out[g] = { rank: n, ppg: arr[Math.min(n, arr.length) - 1] ?? 0 };
+  }
+  return out;
+}
+
+async function fetchDraftState() {
+  if (!S.league?.draft_id) { S.draftPicks = null; S.draftStatus = null; return; }
+  try {
+    const [draft, picks] = await Promise.all([
+      sleeper(`/draft/${S.league.draft_id}`),
+      sleeper(`/draft/${S.league.draft_id}/picks`)]);
+    S.draftStatus = draft?.status || null;
+    S.draftPicks = new Map((picks || []).map(p => [String(p.player_id),
+      { by: p.picked_by, round: p.round, no: p.pick_no }]));
+  } catch { S.draftPicks = null; S.draftStatus = null; }
+}
+
+function renderDraft(v) {
+  v.append(el("div", "status", '<span class="spin"></span>Loading draft state…'));
+  fetchDraftState().then(() => { if (S.tab === "draft") renderDraftInner(v); });
+  // A live draft moves; poll while the tab is open, stop the moment it isn't.
+  clearInterval(S.draftTimer);
+  if (S.draftStatus !== "complete")
+    S.draftTimer = setInterval(async () => {
+      if (S.tab !== "draft") { clearInterval(S.draftTimer); return; }
+      const before = S.draftPicks?.size || 0;
+      await fetchDraftState();
+      if ((S.draftPicks?.size || 0) !== before) render();
+    }, 15000);
+}
+
+function renderDraftInner(v) {
+  v.innerHTML = "";
+  const repl = replacementLevels();
+  const taken = S.draftPicks || new Map();
+  const userByRid = new Map(S.lusers.map(u => [u.user_id, u.display_name]));
+
+  const rows = [];
+  for (const [id, sg] of Object.entries(S.sig || {})) {
+    if (!GROUPS.includes(sg.pos)) continue;
+    if (S.faPos !== "ALL" && sg.pos !== S.faPos) continue;
+    const proj = sg.proj;
+    const vor = proj != null ? proj - repl[sg.pos].ppg : null;
+    const pk = taken.get(id);
+    if (proj == null && !val(id) && !sg.rookie) continue;
+    rows.push({ id, pos: sg.pos, proj, vor, pk,
+      name: S.values[id]?.name || pinfo(id).n, v: val(id) });
+  }
+  rows.sort((a,b) => (b.vor ?? -99) - (a.vor ?? -99) || b.v - a.v);
+
+  const avail = rows.filter(r => !r.pk);
+  const startable = {};
+  for (const g of GROUPS) startable[g] = avail.filter(r => r.pos === g && (r.vor ?? -1) > 0).length;
+
+  const bar = el("div", "controls");
+  ["ALL", ...GROUPS].forEach(g => {
+    const c = el("button", "chip" + (S.faPos === g ? " on" : ""), g);
+    c.addEventListener("click", () => { S.faPos = g; render(); });
+    bar.append(c);
+  });
+  bar.append(el("span", "head-spacer"),
+    el("span", "pill", S.draftStatus ? `draft: ${S.draftStatus.replace("_"," ")}` : "no draft found"),
+    el("span", "pill", `${taken.size} picks made`));
+  v.append(bar);
+
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Startable left", GROUPS.map(g => `${g} ${startable[g]}`).join(" · "),
+      "players projected above replacement, still on the board"),
+    statTile("Replacement level", GROUPS.map(g => `${g}${repl[g].rank}`).join(" · "),
+      `for this league's exact lineup (${S.league?.total_rosters} teams)`),
+    statTile("Picks tracked", taken.size ? "live" : "none yet",
+      taken.size ? "board updates every 15s during the draft" : "board shows the full pool"));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Draft board — value over replacement"),
+    el("div", "sub", "VOR = projected points per game above the last startable player at his position in THIS " +
+      "league. Flex counted half RB, half WR. Filter to one position to see its tier lines — each marks a " +
+      "full-point drop, the moment to stop waiting. Projections carry ±3.3 ppg of honest error; the tags are the tiebreakers."));
+  card.append(evidenceNote());
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>#</th><th>Player</th><th class="num">Age</th>
+    <th class="num">Proj</th><th class="num">VOR</th><th class="num">Value</th>
+    <th>Age tax</th><th>Reads</th><th>Status</th></tr></thead>`;
+  const tb = el("tbody");
+  const shown = rows.slice(0, 140);
+  let lastVor = null, rank = 0;
+  for (const r of shown) {
+    rank++;
+    // Tier breaks only when a single position is filtered: on the ALL view
+    // positions interleave, so a gap between consecutive rows says nothing
+    // about any position's actual cliff.
+    if (S.faPos !== "ALL" && lastVor != null && r.vor != null && lastVor - r.vor >= 1.0)
+      tb.append(el("tr", null, `<td class="gh" colspan="9">— tier break: ${(lastVor - r.vor).toFixed(1)} ppg drop —</td>`));
+    if (r.vor != null) lastVor = r.vor;
+    const at = ageTax(r.id), tag = edgeTag(r.id), sc = successionRead(r.id);
+    const readBits = [];
+    if (!["hold","nosample"].includes(tag.cls)) readBits.push(`<span class="tag ${tag.cls}">${esc(tag.txt)}</span>`);
+    if (sc) readBits.push('<span class="tag diamond">DEV</span>');
+    if (postHype(r.id)) readBits.push('<span class="tag diamond">PH</span>');
+    const row = el("tr", r.pk ? "taken" : null,
+      `<td class="num">${rank}</td>
+       <td>${esc(r.name)} <span class="posbadge">${esc(r.pos)}</span></td>
+       <td class="num">${pinfo(r.id).a ?? "—"}</td>
+       <td class="num">${r.proj != null ? r.proj.toFixed(1) : "—"}</td>
+       <td class="num">${r.vor != null ? `<b class="${r.vor > 0 ? "edge-pos" : ""}">${r.vor > 0 ? "+" : ""}${r.vor.toFixed(1)}</b>` : "—"}</td>
+       <td class="num">${r.v ? fmt(r.v) : "—"}</td>
+       <td>${at ? `<span class="tag ${at.cls}">${esc(at.txt)}</span>` : ""}</td>
+       <td>${readBits.join(" ")}</td>
+       <td>${r.pk ? `<span class="tag sell">R${r.pk.round} · ${esc(userByRid.get(r.pk.by) || "taken")}</span>`
+                  : '<span style="color:var(--ink-muted)">available</span>'}</td>`);
+    const html = fullRead(r.id);
+    row.addEventListener("mousemove", ev => showTT(html, ev));
+    row.addEventListener("mouseleave", hideTT);
+    row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(row);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub",
+    `Showing ${shown.length} of ${rows.length}. Players with no projection (rookies, injuries) sort by market value — ` +
+    `their draft-capital and development reads are in the hover, which is where late-round picks live.`));
+  v.append(card);
 }
 
 /* ---------- trade finder ---------- */

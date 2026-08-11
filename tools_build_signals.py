@@ -438,6 +438,12 @@ meta = {"built": __import__("datetime").date.today().isoformat(),
             "claim": "Touchdown luck did NOT reliably predict market VALUE — opposite signs in the two windows."},
           "projection": {"verdict": "modest",
             "claim": "The projection cut prediction error 7-13% against reusing last season's points, held out of sample."},
+          # Value-matched, permutation-courted (tools/backtest_agetax.py): players 27+
+          # delivered more next-season points per 1,000 of dynasty value than
+          # value-matched players 24 and under, in all three tests including the
+          # two-year stream — but p ranged 0.09-0.23, so chance is not excluded.
+          "ageArb": {"verdict": "suggestive",
+            "claim": "Old-for-price players out-produced their dynasty price in all three windows tested — even across a two-year stream — but none of the tests can rule out chance (p 0.09-0.23). For a team trying to win now, the age discount looks real and unproven: lean on it as a tiebreak, not a strategy."},
           # Both markets fitted against positional rank with a power law, under a
           # permutation court. The consensus curve came out steeper at every
           # single position — a structural disagreement about how much elite
