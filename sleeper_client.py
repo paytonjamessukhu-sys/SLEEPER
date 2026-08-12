@@ -23,12 +23,15 @@ Stdlib only — same rule as the rest of this repo's scripts.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
 import time
 import urllib.error
 import urllib.request
+from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 BASE_URL = "https://api.sleeper.app/v1"
@@ -207,6 +210,31 @@ def _team_names(sleeper: Sleeper, league_id: str) -> dict:
     return names
 
 
+def _season_chain(sleeper: "Sleeper", league: dict) -> list[dict]:
+    """Every season of this league's history, oldest first.
+
+    Sleeper re-creates a new league_id each season and links them backward via
+    previous_league_id, so a league that has run since 2023 is really a chain
+    of four separate league objects. This walks that chain from whichever
+    season you started at back to the very first one.
+    """
+    chain = [league]
+    seen = {league["league_id"]}
+    current = league
+    while True:
+        prev_id = current.get("previous_league_id")
+        if not prev_id or str(prev_id) == "0" or prev_id in seen:
+            break
+        prev = sleeper.get_league(prev_id)
+        if not prev:
+            break
+        chain.append(prev)
+        seen.add(prev["league_id"])
+        current = prev
+    chain.reverse()
+    return chain
+
+
 # ---------------------------------------------------------------------------
 # Shared CLI plumbing
 # ---------------------------------------------------------------------------
@@ -249,8 +277,16 @@ def _pick_league(leagues: list, choice: str | None) -> dict:
                 return league
         if choice.isdigit() and 1 <= int(choice) <= len(leagues):
             return leagues[int(choice) - 1]
-        sys.exit(f"--league '{choice}' does not match a league id or 1-based "
-                 f"index (you are in {len(leagues)} league(s); run 'leagues').")
+        needle = choice.strip().lower()
+        matches = [l for l in leagues if needle in l["name"].strip().lower()]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            sys.exit(f"--league '{choice}' matches {len(matches)} leagues by name "
+                     f"({', '.join(l['name'] for l in matches)}) — use the id or "
+                     "1-based index from 'leagues' instead.")
+        sys.exit(f"--league '{choice}' does not match a league id, 1-based "
+                 f"index, or name (you are in {len(leagues)} league(s); run 'leagues').")
     if len(leagues) > 1:
         print(f"(you are in {len(leagues)} leagues — using '{leagues[0]['name']}'; "
               "pick another with --league)\n", file=sys.stderr)
@@ -424,6 +460,150 @@ def cmd_trending(sleeper: Sleeper, args) -> None:
               f"{entry.get('count', 0):>8,} {verb}")
 
 
+def _fmt_ts(ms: int | None) -> str:
+    if not ms:
+        return "?"
+    return (datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+            .astimezone().strftime("%Y-%m-%d %H:%M"))
+
+
+_TX_LABELS = {"trade": "TRADE", "waiver": "WAIVER",
+             "free_agent": "FREE AGENT", "commissioner": "COMMISH"}
+
+
+def _fmt_transaction(t: dict, names: dict, players: dict) -> str:
+    """One human-readable block (trades) or line (everything else)."""
+    ttype = t.get("type", "?")
+    label = _TX_LABELS.get(ttype, ttype.upper())
+    week = t.get("leg", "?")
+    when = _fmt_ts(t.get("status_updated") or t.get("created"))
+    status = t.get("status", "complete")
+    status_tag = "" if status == "complete" else f" [{status.upper()}]"
+    adds = t.get("adds") or {}
+    drops = t.get("drops") or {}
+    picks = t.get("draft_picks") or []
+    budget = t.get("waiver_budget") or []
+    roster_ids = t.get("roster_ids") or []
+
+    def team(rid) -> str:
+        return names.get(rid, f"Roster {rid}")
+
+    if ttype == "trade":
+        lines = [f"{when}  wk{week:>2}  {label}{status_tag}"]
+        for rid in roster_ids:
+            gets = [_player_label(pid, players) for pid, r in adds.items() if r == rid]
+            gets += [f"{p.get('season', '?')} round {p.get('round', '?')} pick "
+                    f"(orig. {team(p.get('roster_id'))})"
+                    for p in picks if p.get("owner_id") == rid]
+            gets += [f"${fb.get('amount', 0)} FAAB (from {team(fb.get('sender'))})"
+                    for fb in budget if fb.get("receiver") == rid]
+            if gets:
+                lines.append(f"    {team(rid)} gets:  " + "  ·  ".join(gets))
+        return "\n".join(lines)
+
+    rid = roster_ids[0] if roster_ids else None
+    bits = [f"+{_player_label(pid, players)}" for pid in adds]
+    bits += [f"-{_player_label(pid, players)}" for pid in drops]
+    settings = t.get("settings") or {}
+    faab = f"   ${settings['waiver_bid']} FAAB" if settings.get("waiver_bid") else ""
+    note = ((t.get("metadata") or {}).get("notes") or "") if status != "complete" else ""
+    note = f"   ({note})" if note else ""
+    return (f"{when}  wk{week:>2}  {label:<10}{status_tag}  {team(rid):<24} "
+           f"{'  '.join(bits)}{faab}{note}")
+
+
+def _transaction_rows(t: dict, season: str, names: dict, players: dict) -> list[dict]:
+    """Flat rows (one per player/pick/FAAB movement) for CSV export."""
+    ttype, week = t.get("type", "?"), t.get("leg", "")
+    when = _fmt_ts(t.get("status_updated") or t.get("created"))
+    status = t.get("status", "complete")
+    base = {"season": season, "week": week, "date": when, "type": ttype, "status": status}
+    rows = []
+    for pid, rid in (t.get("adds") or {}).items():
+        rows.append({**base, "team": names.get(rid, f"Roster {rid}"),
+                    "action": "add", "detail": _player_label(pid, players)})
+    for pid, rid in (t.get("drops") or {}).items():
+        rows.append({**base, "team": names.get(rid, f"Roster {rid}"),
+                    "action": "drop", "detail": _player_label(pid, players)})
+    for pick in t.get("draft_picks") or []:
+        rows.append({**base, "team": names.get(pick.get("owner_id"), "?"),
+                    "action": "pick",
+                    "detail": f"{pick.get('season', '?')} round {pick.get('round', '?')} "
+                              f"(orig. {names.get(pick.get('roster_id'), '?')})"})
+    for fb in t.get("waiver_budget") or []:
+        rows.append({**base, "team": names.get(fb.get("receiver"), "?"),
+                    "action": "faab",
+                    "detail": f"${fb.get('amount', 0)} (from "
+                              f"{names.get(fb.get('sender'), '?')})"})
+    return rows
+
+
+def cmd_transactions(sleeper: Sleeper, args) -> None:
+    user = _resolve_user(sleeper, args.user)
+    leagues, _season = _resolve_leagues(sleeper, user, args)
+    league = _pick_league(leagues, args.league)
+    chain = _season_chain(sleeper, league)
+    if args.season:
+        chain = [l for l in chain if str(l.get("season")) == str(args.season)]
+        if not chain:
+            sys.exit(f"'{league['name']}' has no {args.season} season.")
+
+    print(f"Walking {len(chain)} season(s) of '{league['name']}' "
+         f"({chain[0].get('season')}-{chain[-1].get('season')})...", file=sys.stderr)
+
+    entries = []  # (season, names, transaction)
+    for season_league in chain:
+        lid = season_league["league_id"]
+        season = str(season_league.get("season", "?"))
+        names = _team_names(sleeper, lid)
+        for week in range(1, 19):
+            for t in sleeper.get_transactions(lid, week):
+                entries.append((season, names, t))
+
+    if args.type != "all":
+        entries = [e for e in entries if e[2].get("type") == args.type]
+    if args.team:
+        needle = args.team.strip().lower()
+        entries = [e for e in entries
+                  if any(needle in e[1].get(rid, "").lower()
+                        for rid in (e[2].get("roster_ids") or []))]
+
+    entries.sort(key=lambda e: e[2].get("status_updated") or e[2].get("created") or 0)
+
+    if args.raw:
+        _dump([{"season": s, **t} for s, _n, t in entries])
+        return
+
+    if args.csv:
+        players = sleeper.get_players(args.sport)
+        rows = [row for s, n, t in entries for row in _transaction_rows(t, s, n, players)]
+        with open(args.csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["season", "week", "date", "type",
+                                                    "status", "team", "action", "detail"])
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"Wrote {len(rows)} rows ({len(entries)} transactions) to {args.csv}",
+             file=sys.stderr)
+        return
+
+    players = sleeper.get_players(args.sport)
+    counts = Counter(t.get("type") for _s, _n, t in entries)
+    seasons_label = (f"{chain[0].get('season')}-{chain[-1].get('season')}"
+                     if len(chain) > 1 else str(chain[0].get("season")))
+    print(f"\n{league['name']} — full transaction history ({seasons_label})\n")
+    print(f"{len(chain)} season(s) · {len(entries)} transactions  "
+         f"({counts.get('trade', 0)} trades, {counts.get('waiver', 0)} waiver moves, "
+         f"{counts.get('free_agent', 0)} free-agent moves, "
+         f"{counts.get('commissioner', 0)} commish moves)")
+
+    current_season = None
+    for season, names, t in entries:
+        if season != current_season:
+            current_season = season
+            print(f"\n{season}\n" + "-" * 40)
+        print(_fmt_transaction(t, names, players))
+
+
 # ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> None:
@@ -457,12 +637,27 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--type", choices=("add", "drop"), default="add")
     p.add_argument("--limit", type=int, default=25)
 
+    p = sub.add_parser("transactions", parents=[common],
+                       help="Full trade/waiver/free-agent history since week 1, "
+                            "walking every season of the league's history")
+    p.add_argument("--league",
+                   help="League id, 1-based index, or name (e.g. 'girls r stupid')")
+    p.add_argument("--type", choices=("all", "trade", "waiver", "free_agent",
+                                      "commissioner"), default="all",
+                   help="Only show this transaction type (default: all)")
+    p.add_argument("--team", help="Only show transactions involving this team "
+                                  "(matches team/display name, case-insensitive)")
+    p.add_argument("--csv", metavar="PATH",
+                   help="Write a flat CSV (one row per player/pick/FAAB move) "
+                        "instead of printing")
+
     args = parser.parse_args(argv)
     sleeper = Sleeper()
     try:
         {"profile": cmd_profile, "leagues": cmd_leagues,
          "standings": cmd_standings, "roster": cmd_roster,
-         "matchup": cmd_matchup, "trending": cmd_trending}[args.command](sleeper, args)
+         "matchup": cmd_matchup, "trending": cmd_trending,
+         "transactions": cmd_transactions}[args.command](sleeper, args)
     except SleeperError as err:
         sys.exit(f"Sleeper API error: {err}")
 

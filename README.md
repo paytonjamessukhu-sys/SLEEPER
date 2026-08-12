@@ -90,6 +90,7 @@ python3 sleeper_client.py standings          # standings (first league)
 python3 sleeper_client.py roster             # your starters + bench
 python3 sleeper_client.py matchup            # this week's head-to-head
 python3 sleeper_client.py trending --type add  # waiver-wire heat check
+python3 sleeper_client.py transactions --league "girls r stupid"  # full trade/waiver history
 ```
 
 Useful flags on every command:
@@ -98,8 +99,17 @@ Useful flags on every command:
 |---|---|
 | `--user NAME` | Any Sleeper username (default `PaySuk34`, or `$SLEEPER_USERNAME`) |
 | `--season 2025` | A past season (default: current, from `/state/nfl`) |
-| `--league <id\|N>` | League id, or 1-based index from the `leagues` list |
+| `--league <id\|N\|name>` | League id, 1-based index from the `leagues` list, or a name substring |
 | `--raw` | Dump the raw API JSON — handy for building on top |
+
+`transactions` is the odd one out: Sleeper mints a new `league_id` every season and
+chains them together via `previous_league_id`, so a league that's run since 2023 is
+really four separate league objects. The command walks that whole chain back to
+week 1 of the very first season and prints every trade, waiver claim, free-agent
+move, and commissioner action in order, team names and player names resolved. Extra
+flags: `--type trade|waiver|free_agent|commissioner` to filter, `--team NAME` to
+show only one team's moves, `--csv out.csv` to export a flat, spreadsheet-ready
+file instead of printing.
 
 ### Using it as a library
 
