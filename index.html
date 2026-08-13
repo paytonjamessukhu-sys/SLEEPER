@@ -1,0 +1,2759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warchest — Dynasty HQ for Sleeper</title>
+<meta name="description" content="KTC-style market values, power rankings, and a trade calculator for your Sleeper fantasy leagues. Read-only, no login.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💎</text></svg>">
+<style>
+/* ---------- theme tokens (light on :root; dark under media + data-theme) ---------- */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb;
+  --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+  --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --seq-fill: #2a78d6; --seq-track: #cde2fb;
+  --up: #006300; --down: #d03b3b;
+  --accent: #2a78d6; --accent-soft: rgba(42,120,214,0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --seq-fill: #3987e5; --seq-track: #0d366b;
+    --up: #0ca30c; --down: #d03b3b;
+    --accent: #3987e5; --accent-soft: rgba(57,135,229,0.16);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19;
+  --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+  --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --seq-fill: #3987e5; --seq-track: #0d366b;
+  --up: #0ca30c; --down: #d03b3b;
+  --accent: #3987e5; --accent-soft: rgba(57,135,229,0.16);
+}
+
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--page); color: var(--ink-1);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input, select { font: inherit; color: var(--ink-1); background: var(--surface);
+  border: 1px solid var(--baseline); border-radius: 8px; padding: 7px 10px; }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px 64px; }
+
+/* ---------- header ---------- */
+header { position: sticky; top: 0; z-index: 20; background: var(--page);
+  border-bottom: 1px solid var(--grid); }
+.head-in { max-width: 1080px; margin: 0 auto; padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+.logo svg { display: block; }
+.logo .tag { font-weight: 400; font-size: 12px; color: var(--ink-muted); }
+.head-spacer { flex: 1; }
+.userbox { display: flex; gap: 8px; align-items: center; }
+.userbox input { width: 150px; }
+.btn { background: var(--accent); color: #fff; border-radius: 8px; padding: 7px 14px; font-weight: 600; }
+.btn.ghost { background: none; color: var(--ink-2); border: 1px solid var(--baseline); }
+.btn:disabled { opacity: .5; cursor: default; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--grid); }
+
+/* ---------- league picker + controls ---------- */
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 14px 0 4px; }
+.chip { border: 1px solid var(--baseline); border-radius: 999px; padding: 5px 12px;
+  color: var(--ink-2); font-size: 13px; }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink-1); font-weight: 600; }
+.pill { font-size: 11px; border: 1px solid var(--baseline); border-radius: 999px;
+  padding: 2px 8px; color: var(--ink-muted); }
+.pill.warn { border-color: var(--s2); color: var(--s2); }
+.seg { display: inline-flex; border: 1px solid var(--baseline); border-radius: 8px; overflow: hidden; }
+.seg button { padding: 5px 12px; font-size: 13px; color: var(--ink-2); }
+.seg button.on { background: var(--accent-soft); color: var(--ink-1); font-weight: 600; }
+
+/* ---------- tabs ---------- */
+nav.tabs { display: flex; gap: 2px; margin: 14px 0 18px; border-bottom: 1px solid var(--grid); }
+nav.tabs button { padding: 9px 14px; color: var(--ink-2); font-weight: 600;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav.tabs button.on { color: var(--ink-1); border-bottom-color: var(--accent); }
+
+/* ---------- cards / layout ---------- */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; margin-bottom: 2px; }
+.card .sub { color: var(--ink-muted); font-size: 12px; margin-bottom: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* grid items default to min-width:auto and refuse to shrink below their content,
+   which pushes a wide table out of the page instead of letting it scroll itself */
+.grid2 > * { min-width: 0; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.statrow { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; min-width: 140px; flex: 1; }
+.stat .lab { font-size: 12px; color: var(--ink-muted); }
+.stat .val { font-size: 26px; font-weight: 600; margin-top: 2px; }
+.stat .sub { font-size: 12px; color: var(--ink-2); }
+
+/* ---------- power ranking bars ---------- */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; font-size: 12px; color: var(--ink-2); }
+.legend .key { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.prow { display: grid; grid-template-columns: 26px 170px 1fr 74px; gap: 10px;
+  align-items: center; padding: 5px 0; }
+.prow .rank { color: var(--ink-muted); font-size: 12px; text-align: right; }
+.prow .team { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .team .you { font-size: 10px; font-weight: 700; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; margin-left: 6px; }
+.prow .val { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); text-align: right; }
+.bar { display: flex; height: 20px; align-items: stretch; }
+.bar .segm { margin-right: 2px; }
+.bar .segm:last-child { margin-right: 0; border-radius: 0 4px 4px 0; }
+@media (max-width: 700px) { .prow { grid-template-columns: 22px 110px 1fr 64px; } }
+
+/* ---------- tables ---------- */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11px; color: var(--ink-muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.me td { background: var(--accent-soft); }
+tr.taken td { opacity: .38; }
+.posgroup td.gh { font-size: 11px; font-weight: 700; color: var(--ink-muted);
+  text-transform: uppercase; letter-spacing: .05em; padding-top: 14px; border-bottom: 1px solid var(--baseline); }
+.meter { display: inline-flex; align-items: center; gap: 8px; width: 100%; }
+.meter .track { flex: 1; height: 8px; border-radius: 4px; background: var(--seq-track); overflow: hidden; }
+.meter .fill { height: 100%; background: var(--seq-fill); border-radius: 0 4px 4px 0; }
+.meter .mval { width: 48px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.delta-up { color: var(--up); } .delta-down { color: var(--down); }
+.posbadge { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px;
+  color: var(--ink-2); border: 1px solid var(--baseline); }
+
+/* ---------- edge tags ---------- */
+.tag { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 6px;
+  letter-spacing: .03em; white-space: nowrap; }
+.tag.diamond { color: #fff; background: var(--s3); border: 1px solid var(--s3); }
+.tag.buy { color: var(--up); border: 1px solid var(--up); }
+.tag.rental { color: var(--s4); border: 1px solid var(--s4); }
+.tag.sell { color: var(--down); border: 1px solid var(--down); }
+.tag.hold { color: var(--ink-muted); border: 1px solid var(--baseline); }
+.tag.nosample { color: var(--ink-muted); border: 1px dashed var(--baseline); }
+.evidence { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  margin: 10px 0 14px; background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.evidence .ev-h { font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--ink-muted); margin-bottom: 8px; }
+.evidence .ev-row { display: flex; gap: 9px; align-items: flex-start;
+  font-size: 12px; color: var(--ink-2); margin-bottom: 5px; line-height: 1.4; }
+.evidence .ev-row .tag { flex: 0 0 auto; margin-top: 1px; }
+.edge-pos { color: var(--up); font-weight: 600; }
+.edge-neg { color: var(--down); font-weight: 600; }
+
+/* ---------- trade calculator ---------- */
+.tside { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); }
+.tside h3 { font-size: 13px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tsearch { position: relative; margin-bottom: 10px; }
+.tsearch input { width: 100%; }
+.sugg { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; background: var(--surface);
+  border: 1px solid var(--baseline); border-radius: 8px; margin-top: 4px; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.sugg button { display: flex; width: 100%; gap: 8px; align-items: center; padding: 8px 10px;
+  text-align: left; font-size: 13px; }
+.sugg button:hover, .sugg button.hl { background: var(--accent-soft); }
+.sugg .sv { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.asset { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--grid); margin-bottom: 6px; font-size: 13px; }
+.asset .av { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.asset .rm { color: var(--ink-muted); font-size: 15px; padding: 0 2px; }
+.asset .rm:hover { color: var(--down); }
+.tside .total { text-align: right; font-weight: 700; font-size: 15px; margin-top: 8px; }
+.tside select { width: 100%; margin-bottom: 8px; }
+.tpick { max-height: 230px; overflow-y: auto; border: 1px solid var(--grid);
+  border-radius: 8px; margin-bottom: 10px; }
+.tpick button { display: flex; width: 100%; gap: 8px; align-items: center;
+  padding: 7px 10px; text-align: left; font-size: 13px;
+  border-bottom: 1px solid var(--grid); }
+.tpick button:last-child { border-bottom: none; }
+.tpick button:hover { background: var(--accent-soft); }
+.tpick .sv { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tpick .empty { padding: 14px 10px; }
+.sig-chips { display: flex; gap: 5px; flex-wrap: wrap; margin: -3px 0 6px; cursor: default; }
+.sig-chips .tag { font-size: 9px; padding: 1px 5px; }
+.sig-notes { margin-bottom: 12px; }
+.sig-note { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-bottom: 4px; }
+.sig-note b { color: var(--ink-1); }
+.trade-idea { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  margin-bottom: 12px; background: var(--surface); }
+.ti-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ti-vs { font-weight: 700; font-size: 13px; }
+.ti-fair { margin-left: auto; font-size: 12px; color: var(--ink-muted); }
+.ti-body { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.ti-side { flex: 1; min-width: 200px; font-size: 13px; }
+.ti-side b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--ink-muted); margin-bottom: 2px; }
+.ti-val { display: block; font-weight: 700; margin-top: 2px; }
+.ti-arrow { font-size: 18px; color: var(--ink-muted); }
+.ti-why { font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+.ti-offer { margin-top: 8px; font-size: 12px; padding: 5px 10px; }
+@media (max-width: 640px) { .ti-body { flex-direction: column; align-items: stretch; }
+  .ti-arrow { text-align: center; } }
+.verdict { margin-top: 16px; }
+.vbar { display: flex; height: 22px; margin: 10px 0 6px; }
+.vbar > div { border-radius: 4px; }
+.vbar .a { background: var(--s1); margin-right: 2px; border-radius: 4px 0 0 4px; }
+.vbar .b { background: var(--s2); border-radius: 0 4px 4px 0; }
+.vlabels { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); }
+.vmsg { text-align: center; font-weight: 700; font-size: 15px; margin-top: 10px; }
+.vmsg .sub { display: block; font-weight: 400; font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+/* ---------- misc ---------- */
+.banner { border: 1px solid var(--s2); background: color-mix(in srgb, var(--s2) 8%, var(--surface));
+  color: var(--ink-1); border-radius: 10px; padding: 10px 14px; margin: 14px 0; font-size: 13px; }
+.banner.err { border-color: var(--down); background: color-mix(in srgb, var(--down) 8%, var(--surface)); }
+.status { color: var(--ink-muted); font-size: 13px; margin: 12px 0; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--grid);
+  border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite;
+  vertical-align: -2px; margin-right: 6px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+#tooltip { position: fixed; z-index: 50; right: 14px; bottom: 14px; background: var(--surface);
+  border: 1px solid var(--baseline); border-radius: 12px; padding: 12px 14px; font-size: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.35); display: none;
+  width: min(380px, calc(100vw - 28px)); max-height: 62vh; overflow-y: auto; }
+#tooltip .tt-close { position: sticky; top: 0; float: right; margin: -4px -6px 0 8px;
+  color: var(--ink-muted); font-size: 16px; line-height: 1; padding: 2px 6px;
+  background: var(--surface); border-radius: 6px; }
+#tooltip .tt-close:hover { color: var(--down); }
+#tooltip .tt-row { margin-bottom: 6px; line-height: 1.5; }
+#tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
+#tooltip .tt-row { display: flex; gap: 10px; justify-content: space-between; color: var(--ink-2); }
+footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--grid);
+  color: var(--ink-muted); font-size: 12px; }
+.hidden { display: none !important; }
+.empty { color: var(--ink-muted); text-align: center; padding: 32px 0; }
+
+/* ---------- phone ---------- */
+@media (max-width: 640px) {
+  .wrap { padding: 0 12px 48px; }
+  .head-in { padding: 10px 12px; gap: 8px; }
+  .logo { font-size: 16px; }
+  .logo .tag { display: none; }
+  .userbox { width: 100%; order: 3; }
+  .userbox input { flex: 1; width: auto; min-width: 0; }
+  .head-spacer { display: none; }
+  /* tab strip scrolls sideways instead of wrapping into two rows */
+  nav.tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    margin: 12px -12px 14px; padding: 0 12px; }
+  nav.tabs::-webkit-scrollbar { display: none; }
+  nav.tabs button { flex: 0 0 auto; padding: 10px 12px; font-size: 13px; }
+  .controls { gap: 6px; margin: 12px 0 2px; overflow-x: auto; scrollbar-width: none;
+    flex-wrap: nowrap; padding-bottom: 2px; }
+  .controls::-webkit-scrollbar { display: none; }
+  .controls > * { flex: 0 0 auto; }
+  /* two stat tiles per row reads better than four squeezed ones */
+  .statrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { min-width: 0; padding: 10px 12px; }
+  .stat .val { font-size: 21px; overflow-wrap: anywhere; }
+  .card { padding: 13px; border-radius: 11px; }
+  .prow { grid-template-columns: 18px 1fr 62px; grid-template-areas: "r t v" ". b b";
+    gap: 4px 8px; padding: 7px 0; }
+  .prow .rank { grid-area: r; } .prow .team { grid-area: t; }
+  .prow .val { grid-area: v; } .prow .bar { grid-area: b; height: 16px; }
+  /* wide tables scroll inside themselves; the page body never scrolls sideways */
+  table { display: block; overflow-x: auto; width: auto; min-width: 100%;
+    -webkit-overflow-scrolling: touch; }
+  th, td { padding: 7px 6px; white-space: nowrap; }
+  .meter { min-width: 130px; }
+  .tside { padding: 12px; }
+  /* comfortable thumb targets */
+  .sugg button { padding: 11px 10px; }
+  .asset { padding: 9px 10px; }
+  .asset .rm { padding: 0 6px; font-size: 17px; }
+  .btn { padding: 9px 14px; }
+  #tooltip { max-width: min(280px, calc(100vw - 24px)); }
+}
+</style>
+</head>
+<body>
+<header><div class="head-in">
+  <span class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5.5 4h13L22 9.5 12 21 2 9.5 5.5 4Z" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M2 9.5h20M8.5 9.5 12 21l3.5-11.5M8.5 9.5 12 4l3.5 5.5" stroke="var(--accent)" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>
+    Warchest <span class="tag">dynasty HQ for Sleeper</span>
+  </span>
+  <span class="head-spacer"></span>
+  <span class="userbox">
+    <img id="uavatar" class="avatar hidden" alt="">
+    <input id="uname" placeholder="Sleeper username" autocomplete="off" spellcheck="false">
+    <button id="loadBtn" class="btn">Load</button>
+    <button id="themeBtn" class="btn ghost" title="Toggle theme">◐</button>
+  </span>
+</div></header>
+
+<div class="wrap">
+  <div id="banner"></div>
+  <div id="controls" class="controls hidden">
+    <span id="leagueChips"></span>
+    <span class="head-spacer"></span>
+    <span class="seg" id="planSeg" title="Your build. Re-prices every player against your goal, not the market's neutral blend.">
+      <button data-plan="contend">Contend</button>
+      <button data-plan="flexible" class="on">Flexible</button>
+      <button data-plan="rebuild">Rebuild</button>
+    </span>
+    <span class="seg" id="modeSeg">
+      <button data-mode="dynasty" class="on">Dynasty</button>
+      <button data-mode="redraft">Redraft</button>
+    </span>
+    <span id="fmtPill" class="pill"></span>
+    <span id="srcPill" class="pill"></span>
+  </div>
+  <div id="status" class="status"><span class="spin"></span>Loading…</div>
+
+  <nav class="tabs hidden" id="tabs">
+    <button data-tab="power" class="on">Power Rankings</button>
+    <button data-tab="rosters">Rosters</button>
+    <button data-tab="players">Players</button>
+    <button data-tab="draft">Draft</button>
+    <button data-tab="board">Buy / Sell Board</button>
+    <button data-tab="tradefinder">Trade Finder</button>
+    <button data-tab="trade">Trade Calculator</button>
+    <button data-tab="freeagents">Free Agents</button>
+    <button data-tab="standings">Standings</button>
+    <button data-tab="market">Market</button>
+  </nav>
+
+  <main id="view"></main>
+
+  <footer>
+    <b>Warchest</b> is read-only: Sleeper's public API has no login and no write access —
+    your password is never needed, never asked for. Values courtesy of the free
+    <a href="https://www.fantasycalc.com" target="_blank" rel="noopener">FantasyCalc</a> API
+    (market-based, KTC-style 0–10k scale); league data from the
+    <a href="https://docs.sleeper.com" target="_blank" rel="noopener">Sleeper API</a>.
+  </footer>
+</div>
+<div id="tooltip"></div>
+
+<script>
+"use strict";
+/* =============================== state =============================== */
+const SLEEPER = "https://api.sleeper.app/v1";
+const FC = "https://api.fantasycalc.com/values/current";
+const CDN = "https://sleepercdn.com";
+const POS_SLOTS = { QB:["QB"], RB:["RB"], WR:["WR"], TE:["TE"], K:["K"], DEF:["DEF"],
+  FLEX:["RB","WR","TE"], WRRB_FLEX:["WR","RB"], WRRB_WRT_FLEX:["WR","RB","TE"],
+  REC_FLEX:["WR","TE"], SUPER_FLEX:["QB","RB","WR","TE"] };
+const GROUPS = ["QB","RB","WR","TE"];
+const GROUP_VARS = { QB:"--s1", RB:"--s2", WR:"--s3", TE:"--s4" };
+
+const S = {
+  username:null, user:null, season:null, seasonType:null, leagues:[], league:null,
+  rosters:[], lusers:[], players:{}, values:{}, picks:[],
+  stats:{}, prodSeason:null, edges:{}, faPos:"ALL", faSort:"edge",
+  sig:{}, sigMeta:null, boardPos:"ALL", boardSide:"buy",
+  mode:"dynasty", source:null, myRosterId:null, tab:"power",
+  trade:{ a:[], b:[] },
+};
+/* A player needs this many games before production is treated as signal rather
+   than noise — a 2-game hot streak should never rank as a positional WR1. */
+const MIN_GP = 6;
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, cls, html) => { const n=document.createElement(tag);
+  if(cls) n.className=cls; if(html!=null) n.innerHTML=html; return n; };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n) => Math.round(n).toLocaleString("en-US");
+
+/* =============================== fetch =============================== */
+/* Demo mode: when a baked dataset is present the app never touches the network,
+   so it runs anywhere outbound requests are sandboxed (e.g. a published
+   artifact). Same rendering code either way — only the transport changes. */
+const DEMO = window.WARCHEST_DEMO || null;
+function demoRoute(url) {
+  if (url.startsWith(FC)) return DEMO.values;
+  const p = url.slice(SLEEPER.length);
+  if (p === "/state/nfl") return DEMO.state;
+  if (p === "/players/nfl") return DEMO.players;
+  if (p.startsWith("/stats/nfl/")) return DEMO.stats || {};
+  if (p.startsWith("/draft/")) return p.endsWith("/picks") ? [] : {};
+  if (p.endsWith("/traded_picks")) return [];
+  if (p.includes("/transactions/")) return [];
+  if (p.includes("/trending/add")) return DEMO.trendingAdd;
+  if (p.includes("/trending/drop")) return DEMO.trendingDrop;
+  if (p.includes("/leagues/nfl/")) return p.endsWith(`/${DEMO.season}`) ? DEMO.leagues : [];
+  if (p.startsWith("/user/")) return DEMO.user;
+  const m = p.match(/^\/league\/([^/]+)\/(\w+)/);
+  if (m) return (DEMO.leagueData[m[1]] || {})[m[2]] ?? [];
+  return null;
+}
+async function getJSON(url, timeoutMs=20000, init) {
+  if (DEMO) return demoRoute(url);
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctl.signal, ...(init || {}) });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+const sleeper = (path) => getJSON(SLEEPER + path);
+
+function lsGet(key, ttlMs) {
+  if (DEMO) return null;   // never mix baked demo data into the real cache
+  try { const raw = localStorage.getItem(key); if (!raw) return null;
+    const { t, d } = JSON.parse(raw);
+    return (Date.now() - t < ttlMs) ? d : null; } catch { return null; }
+}
+function lsSet(key, d) {
+  if (DEMO) return;
+  try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), d })); } catch {}
+}
+
+/* =============================== player db =============================== */
+async function loadPlayers() {
+  const cached = lsGet("wc_players_v1", 24*3600*1000);
+  if (cached) { S.players = cached; return; }
+  if (!DEMO) setStatus("Downloading player database (~5 MB, cached for a day)…");
+  const full = await sleeper("/players/nfl") || {};
+  const trim = {};
+  for (const [id, p] of Object.entries(full)) {
+    if (!p || (!p.active && p.search_rank == null)) continue;
+    trim[id] = { n: p.full_name || `${p.first_name||""} ${p.last_name||""}`.trim() || id,
+      p: p.position || "?", t: p.team || null, a: p.age || null,
+      r: (p.search_rank && p.search_rank < 9999999) ? p.search_rank : null };
+  }
+  S.players = trim;
+  lsSet("wc_players_v1", trim);
+}
+function pinfo(id) {
+  const p = S.players[id];
+  if (p) return p;
+  if (/^[A-Z]{2,3}$/.test(id)) return { n:`${id} D/ST`, p:"DEF", t:id, a:null, r:null };
+  return { n:`Player ${id}`, p:"?", t:null, a:null, r:null };
+}
+
+/* =============================== values =============================== */
+function leagueFormat() {
+  const rp = S.league?.roster_positions || [];
+  const sf = rp.includes("SUPER_FLEX") || rp.filter(x => x === "QB").length >= 2;
+  const ppr = S.league?.scoring_settings?.rec ?? 1;
+  const tep = (S.league?.scoring_settings?.bonus_rec_te || 0) > 0;
+  return { numQbs: sf ? 2 : 1, ppr, tep, teams: S.league?.total_rosters || 12 };
+}
+async function loadValues() {
+  const f = leagueFormat();
+  const dyn = S.mode === "dynasty";
+  const key = `wc_fc_${dyn}_${f.numQbs}_${f.teams}_${f.ppr}`;
+  S.values = {}; S.picks = [];
+  let rows = lsGet(key, 6*3600*1000);
+  if (!rows) {
+    try {
+      rows = await getJSON(`${FC}?isDynasty=${dyn}&numQbs=${f.numQbs}&numTeams=${f.teams}&ppr=${f.ppr}`);
+      if (Array.isArray(rows) && rows.length) lsSet(key, rows); else rows = null;
+    } catch { rows = null; }
+  }
+  if (rows) {
+    S.source = "fantasycalc";
+    for (const row of rows) {
+      const sid = row?.player?.sleeperId;
+      const entry = { v: row.value || 0, rv: row.redraftValue || 0,
+        ovr: row.overallRank ?? null,
+        pr: row.positionRank ?? null, tr: row.trend30Day ?? 0,
+        pos: row?.player?.position || null, name: row?.player?.name || null };
+      if (sid != null && sid !== "") S.values[String(sid)] = entry;
+      else if (dyn && /\b20\d{2}\b/.test(entry.name || "") ) S.picks.push(entry);
+    }
+    S.picks.sort((a,b) => b.v - a.v);
+  } else {
+    // Fallback: estimate from Sleeper's own search rank (exponential decay onto a 0–10k scale).
+    S.source = "estimate";
+    for (const [id, p] of Object.entries(S.players)) {
+      if (p.r == null) continue;
+      const v = Math.round(9999 * Math.exp(-(p.r - 1) / 85));
+      if (v >= 5) S.values[id] = { v, ovr: p.r, pr: null, tr: 0, pos: p.p, name: p.n };
+    }
+  }
+  $("#srcPill").textContent = S.source === "fantasycalc"
+    ? `values: FantasyCalc (${dyn ? "dynasty" : "redraft"})` : "values: estimated";
+  $("#srcPill").classList.toggle("warn", S.source === "estimate");
+}
+const val = (id) => S.values[id]?.v || 0;
+
+/* =============================== production =============================== */
+/* Layer 1 of the front office: what a player actually SCORED, versus what the
+   market CHARGES for him. The gap between those two is the whole edge. */
+
+async function loadStatsFor(season) {
+  const key = `wc_stats_${season}`;
+  const cached = lsGet(key, 12*3600*1000);
+  if (cached) return cached;
+  const raw = await getJSON(`${SLEEPER}/stats/nfl/regular/${season}`) || {};
+  const trim = {};
+  for (const [id, s] of Object.entries(raw)) {
+    // Team defenses key as TEAM_XX here but as XX everywhere else; skip — the
+    // DEF market is too thin to grade and would only add join bugs.
+    if (!s || id.startsWith("TEAM_") || !(s.gp > 0)) continue;
+    const ppr = s.pts_ppr || 0;
+    if (ppr <= 0) continue;
+    trim[id] = { ppr, half: s.pts_half_ppr ?? ppr, std: s.pts_std ?? ppr, gp: s.gp };
+  }
+  lsSet(key, trim);
+  return trim;
+}
+/* Opportunity data, baked from nflverse and served beside this file. Browsers
+   cannot fetch nflverse directly (its releases send no CORS headers), so the
+   join happens offline and lands here as a same-origin file. It is a dated
+   snapshot, not a live feed — the UI says so rather than implying otherwise. */
+async function loadSignals() {
+  try {
+    // Always revalidate. A weekly job rewrites this file, and Pages caches it
+    // hard enough that returning visitors would keep reading a stale snapshot
+    // long after the refresh landed. no-cache still gets a cheap 304 when it
+    // has not moved — it is the staleness that is expensive, not the request.
+    const blob = await getJSON("./data/signals.json", 15000, { cache: "no-cache" });
+    if (blob && blob.players) { S.sig = blob.players; S.sigMeta = blob.meta || null; return; }
+  } catch {}
+  S.sig = {}; S.sigMeta = null;
+}
+
+/* Value-path risk, baked from ~7 years of DynastyProcess weekly history by
+   tools_build_risk.py. Optional file — the app works without it. */
+async function loadRisk() {
+  try {
+    const blob = await getJSON("./data/risk.json", 15000, { cache: "no-cache" });
+    if (blob && blob.players) { S.risk = blob.players; S.riskMeta = blob.meta || null; return; }
+  } catch {}
+  S.risk = {}; S.riskMeta = null;
+}
+
+async function loadStats() {
+  // Preseason has no games yet, so last completed season is the honest baseline.
+  // Once the year is underway we prefer live data, but only after enough of the
+  // league has actually played — otherwise week 1 would grade everyone off one game.
+  const cur = String(S.season), prev = String(Number(S.season) - 1);
+  let season = cur, stats = {};
+  if (S.seasonType && S.seasonType !== "pre") {
+    stats = await loadStatsFor(cur);
+    const deep = Object.values(stats).filter(s => s.gp >= MIN_GP).length;
+    if (deep < 50) { season = prev; stats = await loadStatsFor(prev); }
+  } else {
+    stats = await loadStatsFor(prev);
+    season = prev;
+  }
+  S.stats = stats || {};
+  S.prodSeason = season;
+}
+
+/* Which Sleeper scoring column matches this league's reception settings. */
+function statKey() {
+  const ppr = leagueFormat().ppr;
+  return ppr >= 1 ? "ppr" : ppr >= 0.5 ? "half" : "std";
+}
+
+/* Compare a player only against his own peer group, then ask: at his PRODUCTION
+   rank inside that group, what does the market normally charge? The gap between
+   that implied price and his real price is the edge.
+
+   The peer group is position + age band in dynasty, because a dynasty price is a
+   bet on future seasons — a 33-year-old outscoring his price is the age discount
+   working as intended, not a bargain. Redraft buys one season only, so there age
+   is irrelevant and the cohort is the whole position. */
+const FULL_GP = 14;          // games needed before a sample carries full weight
+const AGE_BANDS = [[24,"≤24"], [27,"25–27"], [30,"28–30"], [99,"31+"]];
+const ageBand = (a) => a == null ? "?" : (AGE_BANDS.find(b => a <= b[0]) || AGE_BANDS[3])[1];
+
+/* What a player is owed by his usage, regardless of whether the ball bounced in.
+   Touchdowns are the least stable thing in football and opportunity is the most,
+   so the two are kept apart: `ppg` is what he scored, `xppg` is what that same
+   season looks like with lucky and unlucky touchdowns taken back out. */
+function production(id) {
+  const sg = S.sig?.[id];
+  const yr = S.sigMeta?.latest;
+  const s = sg && yr ? sg.s?.[yr] : null;
+  if (s) return { ppg: s.ppg, xppg: s.xppg, gp: s.g, tdLuck: (s.td ?? 0) - (s.xtd ?? 0),
+    wopr: s.wopr ?? null, ts: s.ts ?? null, snap: s.snp ?? null,
+    tgt: s.tgt ?? 0, car: s.car ?? 0, draft: sg.d || null, src: "nflverse" };
+  // Fallback to Sleeper's own season totals if the baked file is missing. No
+  // opportunity data there, so luck cannot be separated — say so, don't fake it.
+  const st = S.stats[id], k = statKey(), gp = st?.gp || 0;
+  if (gp > 0) { const ppg = (st[k] ?? st.ppr ?? 0) / gp;
+    return { ppg, xppg: ppg, gp, tdLuck: null, wopr: null, ts: null, snap: null,
+      tgt: 0, car: 0, draft: null, src: "sleeper" }; }
+  return null;
+}
+
+/* Who's the current starter at each NFL team+position, from ESPN's depth
+   chart (via nflverse, refreshed ~daily). This needs no fantasy roster at all
+   — it's the one signal in this app that works before either league drafts,
+   because it's asking about NFL teams, not fantasy ones. */
+function computeDepthIndex() {
+  S.starterAt = {};                        // "TEAM|POS" -> sleeper id of the rank-1 guy
+  for (const [id, sg] of Object.entries(S.sig || {})) {
+    const dc = sg.dc; if (!dc || dc.rank !== 1) continue;
+    S.starterAt[`${dc.team}|${dc.pos}`] = id;
+  }
+}
+
+/* The bet dynasty value partly is: a young player who doesn't have the role
+   yet, stuck behind a starter whose window is closing. Needs no production of
+   his own to mean something — that's the point, and why it's kept distinct
+   from Edge, which needs production to exist at all. */
+function successionRead(id) {
+  const dc = S.sig?.[id]?.dc;
+  if (!dc || dc.rank === 1 || dc.rank > 3) return null;   // already starting, or too buried to matter
+  const incId = S.starterAt[`${dc.team}|${dc.pos}`];
+  if (!incId || incId === id) return null;
+  const myAge = pinfo(id).a, incAge = pinfo(incId).a;
+  if (myAge == null || incAge == null) return null;
+  const myCurve = ageRead(id), incCurve = ageRead(incId);
+  const stillDeveloping = myCurve && myCurve.cls === "diamond";           // ascending, per the position curve
+  const incFading = (incCurve && ["hold","sell"].includes(incCurve.cls)) || (incAge - myAge >= 5);
+  if (!stillDeveloping || !incFading) return null;
+  // Filter out pure camp bodies: needs either real draft capital or some value
+  // already recognized by the market, or this is noise, not a real bet.
+  const d = draftRead(id);
+  if (!(d && d.strong) && val(id) < 200) return null;
+  const incName = S.values[incId]?.name || pinfo(incId).n;
+  return { cls: "diamond", txt: `${dc.pos}${dc.rank} BEHIND ${incAge}yo`,
+    incId, incName, myAge, incAge,
+    why: `${dc.pos}${dc.rank} on ${dc.team} behind ${incName} (${incAge}` +
+      (incCurve && incCurve.cls === "sell" ? `, past the ${dc.pos} peak window` :
+       incCurve && incCurve.cls === "hold" ? `, on the back half of his prime` : "") +
+      `). A real workload change is a roster move away, and the market isn't pricing for it yet.` };
+}
+
+function computeEdges() {
+  const dyn = S.mode === "dynasty";
+  S.edges = {};
+  const cohorts = {};
+  for (const [id, e] of Object.entries(S.values)) {
+    const p = pinfo(id), pos = e.pos || p.p;
+    if (!GROUPS.includes(pos)) continue;   // QB/RB/WR/TE — K and DEF markets are noise
+    const pr = production(id);
+    const band = dyn ? ageBand(p.a) : "all";
+    // Rank on luck-adjusted points. Ranking on raw points prices a player's
+    // touchdown variance as if it were skill, which is how a fully healthy
+    // Justin Jefferson reads as the most overpriced man in the league.
+    const rec = { id, v: e.v, ppg: pr?.xppg ?? 0, rawPpg: pr?.ppg ?? 0,
+      gp: pr?.gp ?? 0, pos, band, pr };
+    (cohorts[`${pos}|${band}`] ||= []).push(rec);
+  }
+  for (const [key, rows] of Object.entries(cohorts)) {
+    const [pos, band] = key.split("|");
+    const q = rows.filter(r => r.gp >= MIN_GP && r.ppg > 0 && r.v > 0);
+    const small = q.length < 5;   // too few peers for a price ladder to mean anything
+    const byPrice = [...q].sort((a,b) => b.v - a.v);
+    const curve = byPrice.map(r => r.v);                       // the price ladder
+    const priceRank = new Map(byPrice.map((r,i) => [r.id, i+1]));
+    if (!small) [...q].sort((a,b) => b.ppg - a.ppg).forEach((r, i) => {
+      const implied = curve[i] ?? 0;
+      // Shrink toward zero on thin samples: eight games should not shout as loudly
+      // as a full season. Straight-line confidence, easy to explain and to audit.
+      const conf = Math.min(1, r.gp / FULL_GP);
+      S.edges[r.id] = { pos, band, ppg: r.ppg, rawPpg: r.rawPpg, gp: r.gp, conf,
+        prodRank: i+1, priceRank: priceRank.get(r.id), implied,
+        rawEdge: implied - r.v, edge: Math.round((implied - r.v) * conf), cohort: q.length,
+        tdLuck: r.pr?.tdLuck ?? null, wopr: r.pr?.wopr ?? null, ts: r.pr?.ts ?? null,
+        snap: r.pr?.snap ?? null, tgt: r.pr?.tgt ?? 0, car: r.pr?.car ?? 0,
+        draft: r.pr?.draft ?? null, src: r.pr?.src ?? null };
+    });
+    // Everyone else still gets a record, so the UI can say "not graded" and why,
+    // rather than silently dropping rookies and injured players as if judged.
+    for (const r of rows) if (!S.edges[r.id])
+      S.edges[r.id] = { pos, band, ppg: r.ppg, rawPpg: r.rawPpg, gp: r.gp, conf: 0,
+        prodRank: null, priceRank: null, implied: null, rawEdge: null, edge: null,
+        cohort: q.length, smallCohort: small,
+        tdLuck: r.pr?.tdLuck ?? null, wopr: r.pr?.wopr ?? null, ts: r.pr?.ts ?? null,
+        snap: r.pr?.snap ?? null, tgt: r.pr?.tgt ?? 0, car: r.pr?.car ?? 0,
+        draft: r.pr?.draft ?? null, src: r.pr?.src ?? null };
+  }
+}
+
+/* A verdict, not a black box: every tag is a plain rule you can read off the row.
+   Deliberately conservative — the engine's job is to raise questions worth asking,
+   not to hand down judgements it cannot support. */
+function edgeTag(id) {
+  const e = S.edges[id];
+  if (!e) return { cls:"nosample", txt:"—", why:"Not in the graded pool." };
+  if (e.edge == null) {
+    // A player with no snaps is not unknowable — where he was drafted is real
+    // information, and it is the only thing a rookie has. Say that, rather than
+    // filing the entire incoming class under "no data".
+    const d = draftRead(id);
+    if (!e.gp && d) return {
+      cls: d.strong ? "buy" : "hold", txt: d.strong ? "CAPITAL" : "LOW CAPITAL",
+      why: `No NFL production to judge yet. ${d.why} Draft position is the only signal here, so this is a prior, not a grade.` };
+    return { cls:"nosample", txt:"NOT GRADED",
+      why: e.smallCohort ? `Too few ${e.pos}s his age to build a fair comparison.`
+         : e.gp ? `Only ${e.gp} game${e.gp === 1 ? "" : "s"} played — too thin to grade.`
+         : "No games in the baseline season, so there is nothing to price against." };
+  }
+  const age = pinfo(id).a, tr = S.values[id]?.tr || 0, v = val(id);
+  // Both floors matter. The implied floor keeps deep-bench noise out; the floor on
+  // his ACTUAL price keeps out players the market has written off entirely — a man
+  // valued at 70 who out-ranks a thin rookie cohort is not a diamond, he is a rounding error.
+  const material = v >= 500 && e.implied >= 1000;
+  const sample = e.gp < FULL_GP ? ` (${e.gp}-game sample, so the number is damped)` : "";
+  const line = `Produces like ${e.pos}${e.prodRank} of ${e.cohort} in the ${e.band} group, priced like ${e.pos}${e.priceRank}`;
+  if (!material || Math.abs(e.edge) < 500)
+    return { cls:"hold", txt:"HOLD", why: material ? "Price and production roughly agree."
+      : "Too lightly valued to trade on — the comparison is not meaningful this far down the board." };
+  if (e.edge > 0) {
+    if (S.mode === "dynasty" && age && age <= 24)
+      return { cls:"diamond", txt:"DIAMOND", why:`${line}, and he is only ${age}.${sample}` };
+    if (S.mode === "dynasty" && age && age >= 29)
+      return { cls:"rental", txt:"RENTAL", why:`${line}, but he is ${age} — a win-now rental, not a foundation piece.${sample}` };
+    return { cls:"buy", txt:"BUY", why:`${line}.${sample}` };
+  }
+  // An elite price is the market's multi-year conviction. One weak season is not
+  // enough to overturn it, so flag the disagreement without calling it a sell.
+  // Scaled to cohort size — a fixed cut-off would make every player in a small
+  // group untouchable and no player in a large one protected.
+  if (e.priceRank <= Math.max(5, Math.ceil(e.cohort * 0.25)))
+    return { cls:"hold", txt:"WATCH", why:`${line} — but an elite price reflects years of evidence, ` +
+      `and one down season rarely overturns it. Worth watching, not dumping.${sample}` };
+  return { cls:"sell", txt:"SELL", why:`${line}` +
+    (tr > 0 ? " — and the market is still climbing, so the window to move him is open." : ".") + sample };
+}
+/* Opportunity, graded on the scale that fits the position. WOPR blends target
+   share with air-yards share and is the best single usage number for a pass
+   catcher; backs live on touches with snap share as the gate. */
+function opportunity(id) {
+  const e = S.edges[id]; if (!e) return null;
+  const pos = e.pos;
+  if (pos === "WR" || pos === "TE") {
+    if (e.wopr == null) return null;
+    const w = e.wopr;
+    return { val: w, txt: w.toFixed(2), lab: "WOPR",
+      tier: w >= 0.70 ? "elite" : w >= 0.55 ? "strong" : w >= 0.35 ? "rotational" : "thin",
+      why: `${(e.ts*100 || 0).toFixed(0)}% target share` + (e.snap != null ? `, ${(e.snap*100).toFixed(0)}% of snaps` : "") };
+  }
+  if (pos === "RB") {
+    const touches = (e.car || 0) + (e.tgt || 0);
+    if (!touches) return null;
+    return { val: touches / 25, txt: touches.toFixed(1), lab: "touch/gm",
+      tier: touches >= 18 ? "elite" : touches >= 13 ? "strong" : touches >= 8 ? "rotational" : "thin",
+      why: `${(e.car||0).toFixed(1)} carries + ${(e.tgt||0).toFixed(1)} targets a game` +
+        (e.snap != null ? `, ${(e.snap*100).toFixed(0)}% of snaps` : "") };
+  }
+  if (pos === "QB") {
+    if (e.snap == null) return null;
+    return { val: e.snap, txt: (e.snap*100).toFixed(0) + "%", lab: "snaps",
+      tier: e.snap >= 0.90 ? "elite" : e.snap >= 0.6 ? "strong" : "rotational",
+      why: "share of his offense's snaps" };
+  }
+  return null;
+}
+
+/* Touchdowns regress harder than anything else a player does, which makes the
+   gap between scored and expected the most reliable mispricing signal there is.
+   Negative luck on heavy usage is the buy; positive luck on light usage is the sell. */
+function luckRead(id) {
+  const e = S.edges[id];
+  if (!e) return null;
+  // Prefer the full expected-points gap (ffverse xFP: yardage, completions and
+  // touchdowns priced per play) over the in-house TD-only line when it shipped.
+  const fxd = S.sig?.[id]?.s?.[S.sigMeta?.latest]?.fxd;
+  if (fxd != null) {
+    if (fxd <= -1.5) return { cls:"buy", txt:`${fxd.toFixed(1)}/gm`, dir:"unlucky",
+      why:`Scored ${Math.abs(fxd).toFixed(1)} points a game below what his opportunities were worth (ffverse expected-points model). The opportunities are the part that carries over.` };
+    if (fxd >= 1.5) return { cls:"sell", txt:`+${fxd.toFixed(1)}/gm`, dir:"lucky",
+      why:`Scored ${fxd.toFixed(1)} points a game above what his opportunities were worth. That overshoot is the least repeatable part of his season.` };
+    return { cls:"hold", txt:(fxd>0?"+":"")+fxd.toFixed(1)+"/gm", dir:"neutral",
+      why:"Scoring landed about where his opportunities said it should (ffverse expected-points model)." };
+  }
+  if (e.tdLuck == null) return null;
+  const l = e.tdLuck;
+  if (l <= -2) return { cls:"buy", txt:`${l.toFixed(1)} TD`, dir:"unlucky",
+    why:`Scored ${Math.abs(l).toFixed(1)} fewer touchdowns than his volume implied. Touchdowns regress; the usage is what carries over.` };
+  if (l >= 2) return { cls:"sell", txt:`+${l.toFixed(1)} TD`, dir:"lucky",
+    why:`Scored ${l.toFixed(1)} more touchdowns than his volume implied. That part of last season is the least likely to repeat.` };
+  return { cls:"hold", txt: (l>0?"+":"") + l.toFixed(1) + " TD", dir:"neutral",
+    why:"Touchdowns landed about where his volume said they should." };
+}
+
+/* Draft capital, the only real signal a player with no NFL snaps has. The
+   evidence behind it is strongest at receiver — most top-50 fantasy WRs came out
+   of the first three rounds — and admittedly murkier at running back, where the
+   league's own devaluation of the position muddies it. The read says which. */
+const CAPITAL = [[15,"premium","a top-15 pick"], [45,"early","a first or second rounder"],
+                 [105,"mid","a day-two pick"], [999,"late","a late-round pick"]];
+function draftRead(id) {
+  const e = S.edges[id], d = e?.draft || S.sig?.[id]?.d;
+  if (!d) return null;
+  const [, tier, phrase] = CAPITAL.find(c => d.pk <= c[0]) || CAPITAL[3];
+  const pos = e?.pos || S.sig?.[id]?.pos;
+  const strong = tier === "premium" || tier === "early";
+  const caveat = pos === "RB"
+    ? " Draft capital is a weaker guide at running back than anywhere else."
+    : pos === "WR" && strong
+      ? " Draft capital carries most at receiver, where nearly all top-50 fantasy seasons come from the first three rounds."
+      : "";
+  return { tier, strong, txt: `R${d.rd}.${String(d.pk).padStart(2,"0")}`,
+    why: `${d.yr} draft, ${phrase} (round ${d.rd}, pick ${d.pk}).${caveat}` };
+}
+
+/* Usage direction. A player whose opportunity is climbing is the one worth
+   getting to before the scoring catches up; opportunity moves before points do. */
+function usageTrend(id) {
+  const sg = S.sig?.[id];
+  const yrs = S.sigMeta?.seasons;
+  if (!sg || !yrs || yrs.length < 2) return null;
+  const cur = sg.s?.[S.sigMeta.latest];
+  const prevYr = [...yrs].filter(y => y !== S.sigMeta.latest).sort().pop();
+  const prev = sg.s?.[prevYr];
+  if (!cur || !prev) return null;
+  const pos = sg.pos;
+  const pick = (s) => pos === "RB" ? (s.car || 0) + (s.tgt || 0)
+    : pos === "QB" ? (s.snp ?? 0) * 100 : (s.wopr ?? 0) * 100;
+  const a = pick(prev), b = pick(cur);
+  if (!a && !b) return null;
+  const d = b - a;
+  const unit = pos === "RB" ? "touches/gm" : pos === "QB" ? "pts of snap share" : "pts of WOPR";
+  const big = Math.abs(d) >= (pos === "RB" ? 3 : 8);
+  return { d, big, dir: d > 0 ? "up" : d < 0 ? "down" : "flat",
+    txt: (d > 0 ? "▲" : d < 0 ? "▼" : "·") + " " + Math.abs(d).toFixed(pos === "RB" ? 1 : 0),
+    why: `Usage ${d > 0 ? "climbed" : "fell"} ${Math.abs(d).toFixed(1)} ${unit} from ${esc(prevYr)} to ${esc(S.sigMeta.latest)}.` };
+}
+
+/* Where a player sits on his position's age curve. The shapes are well
+   established even if the exact ages shift a year either way by study: backs
+   peak early and fall off a cliff, receivers peak later and hold on far longer,
+   tight ends peak latest of all. */
+const CURVES = {
+  RB: { peak:[24,26], cliff:29, note:"Backs peak at 24–26; nearly every peak season happens before 29." },
+  WR: { peak:[26,28], cliff:31, note:"Receivers peak around 26–28 and hold value years longer than backs." },
+  TE: { peak:[26,29], cliff:32, note:"Tight ends peak latest and hold the longest window of the skill positions." },
+  QB: { peak:[27,32], cliff:37, note:"Quarterbacks hold value longest of anyone." },
+};
+function ageRead(id) {
+  const p = pinfo(id), e = S.edges[id];
+  const pos = e?.pos || S.sig?.[id]?.pos;
+  const c = CURVES[pos];
+  if (!c || !p.a) return null;
+  const a = p.a;
+  if (a < c.peak[0]) return { cls:"diamond", txt:"ASCENDING", why:`${a} — still short of the ${pos} peak. ${c.note}` };
+  if (a <= c.peak[1]) return { cls:"buy", txt:"PEAK", why:`${a} — squarely in the ${pos} peak window. ${c.note}` };
+  if (a < c.cliff) return { cls:"hold", txt:"POST-PEAK", why:`${a} — past the peak but before the drop. ${c.note}` };
+  return { cls:"sell", txt:"CLIFF", why:`${a} — past the age where ${pos}s hold value. ${c.note}` };
+}
+
+/* The classic post-hype shape: real draft capital, still young, has not produced,
+   and the market has stopped paying for him. The community treats this as a known
+   inefficiency; the honest caveat is that it is far less rigorously demonstrated
+   than touchdown regression, so it is surfaced as a question, not a verdict. */
+function postHype(id) {
+  const e = S.edges[id], d = draftRead(id), p = pinfo(id);
+  if (!e || !d || !d.strong || !p.a || p.a > 25) return null;
+  // Skill positions only. A quarterback's opportunity is binary — he starts or
+  // he does not — and WOPR is ~0 for all of them, so judging QBs on it flags
+  // every young passer in the league, starters included.
+  if (!["RB","WR","TE"].includes(e.pos)) return null;
+  const sg = S.sig?.[id]?.s?.[S.sigMeta?.latest];
+  if (!sg || sg.g < 6) return null;
+  const weak = (e.pos === "RB" ? (sg.car + sg.tgt) < 10 : (sg.wopr ?? 0) < 0.45);
+  const v = val(id);
+  if (!weak || v > 3000 || v < 300) return null;   // too dear to be forgotten, too cheap to matter
+  return { why: `Real draft capital (${d.txt}), still only ${p.a}, and the market has stopped paying for him. ` +
+    `That is the shape a post-hype breakout takes — though this pattern is community lore more than proven research, so treat it as a question worth asking.` };
+}
+
+/* The board score: usage he has earned, luck he has not, and a price that has
+   not caught up. Deliberately additive and inspectable rather than a fitted model —
+   every point of it can be read off the row it came from. */
+function boardScore(id) {
+  const e = S.edges[id]; if (!e || e.edge == null) return null;
+  const o = opportunity(id), l = e.tdLuck;
+  if (!o || l == null) return null;
+  const oppBoost = { elite: 1.0, strong: 0.6, rotational: 0.25, thin: 0 }[o.tier] ?? 0;
+  // Unlucky players score higher on the buy board, lucky ones on the sell board.
+  return e.edge + (-l * 220) + (oppBoost * 900);
+}
+/* Next season's points per game, from a model fitted offline and baked in.
+   Shown with its measured error, because a single confident number would be a
+   lie: held out of sample it beats reusing last year's points by 7-13%, which
+   is a real edge and a modest one. */
+function projection(id) {
+  const p = S.sig?.[id]?.proj;
+  const m = S.sigMeta?.model;
+  if (p == null || !m) return null;
+  const err = m.rmse || 3.3;
+  return { ppg: p, lo: Math.max(0, p - err), hi: p + err, rmse: err, projects: m.projects,
+    why: `Projected ${p.toFixed(1)} points a game in ${m.projects}, give or take ${err.toFixed(1)}. ` +
+      `Fitted on the ${m.trainedOn} transition; out of sample it beats simply reusing last season by 7–13%.` };
+}
+
+/* Two independent markets, and the gap between them. FantasyCalc prices from
+   actual trades; DynastyProcess from expert consensus rankings. Agreement means
+   the price is settled. A wide gap means one of them is wrong, and that is a far
+   better mispricing signal than trusting either on its own. */
+function marketSplit(id) {
+  const r = S.mktRank?.[id];
+  if (!r) return null;
+  const d = r.dp - r.fc;                       // positive = consensus rates him lower
+  // Ranks near the bottom of a position are noise; a gap of a few places is not
+  // a disagreement. Both markets must roster him and the gap must be real.
+  if (Math.max(r.fc, r.dp) > 60 || Math.abs(d) < 8) return null;
+  return { fcRank: r.fc, dpRank: r.dp, gap: d, pos: r.pos,
+    dir: d > 0 ? "dear-here" : "cheap-here",
+    txt: (d > 0 ? "+" : "") + d,
+    why: d < 0
+      ? `FantasyCalc has him ${r.pos}${r.fc}; the expert consensus has him ${r.pos}${r.dp} — ${Math.abs(d)} places higher. Two independent markets disagree, and that gap is where mispricing lives.`
+      : `FantasyCalc has him ${r.pos}${r.fc} but the consensus has him only ${r.pos}${r.dp}, ${d} places lower. Worth knowing before you pay the trade-based price.` };
+}
+/* Rank each player inside each market separately. Comparing ranks rather than
+   values sidesteps the fact that the two shops use different scales AND
+   differently shaped curves — one multiplier cannot reconcile those, and trying
+   made every player look mispriced in the same direction. */
+function calibrateMarkets() {
+  const f = leagueFormat();
+  const fcBy = {}, dpBy = {};
+  for (const [id, sg] of Object.entries(S.sig || {})) {
+    const pos = sg.pos;
+    if (!GROUPS.includes(pos)) continue;
+    const v = val(id), o = f.numQbs === 2 ? (sg.dp?.v2 || sg.dp?.v1) : sg.dp?.v1;
+    if (v > 0 && o > 0) { (fcBy[pos] ||= []).push([id, v]); (dpBy[pos] ||= []).push([id, o]); }
+  }
+  S.mktRank = {};
+  for (const pos of Object.keys(fcBy)) {
+    const rank = (arr) => { const m = {};
+      [...arr].sort((a,b) => b[1]-a[1]).forEach(([id], i) => m[id] = i+1); return m; };
+    const rf = rank(fcBy[pos]), rd = rank(dpBy[pos]);
+    for (const id of Object.keys(rf)) S.mktRank[id] = { fc: rf[id], dp: rd[id], pos };
+  }
+}
+
+/* How turbulent this player's market value has actually been, against players
+   of his own position and price tier. Measured on share of the total market
+   (the value scale itself inflates), over the trailing ~2 years of weekly
+   DynastyProcess history. Survivorship makes every drawdown a floor: players
+   who crash out of the file stop reporting before the bottom. */
+function riskRead(id) {
+  const r = S.risk?.[id], meta = S.riskMeta;
+  if (!r || !meta?.arch) return null;
+  const tier = r.cur > 100 ? "elite" : r.cur > 10 ? "startable" : "tail";
+  const peer = meta.arch[`${r.pos}_${tier}`];
+  if (!peer) return null;
+  const ratio = peer.vol_med > 0 ? r.vol / peer.vol_med : 1;
+  const ratioD = peer.mdd_med > 0 ? r.mdd / peer.mdd_med : 1;
+  // Labels are RELATIVE to position-and-tier peers: the median startable player
+  // slides 70%+ inside two years, so an absolute threshold marks nearly the
+  // whole league FRAGILE and the chip stops meaning anything. One absolute
+  // floor survives: no 60%+ slide gets called steady, whatever his new
+  // neighbours look like — that's how a crashed Kelce briefly read STEADY.
+  const cls = (ratio >= 1.4 || ratioD >= 1.25) ? "sell"
+            : (ratio <= 0.7 && r.mdd < 0.6) ? "buy" : "hold";
+  const label = cls === "buy" ? "STEADY" : cls === "sell" ? "FRAGILE" : "TYPICAL";
+  const tierTxt = tier === "tail" ? "deep" : tier;
+  return { cls, txt: label, vol: r.vol, mdd: r.mdd, tier,
+    why: `Worst slide of the last two years: ${(r.mdd*100).toFixed(0)}% off its peak ` +
+      `(the median ${tierTxt} ${r.pos} slides ${(peer.mdd_med*100).toFixed(0)}%). Week-to-week his price is ` +
+      `${ratio <= 0.7 ? "notably calmer than" : ratio >= 1.4 ? `${ratio.toFixed(1)}× as turbulent as` : "about as turbulent as"} ` +
+      `his peers'. Players who crash out of the data entirely stop reporting, so every drawdown here is a floor, not a ceiling.` };
+}
+
+/* Rookie picks, priced on the same scale as players. DynastyProcess prices
+   picks as ECR ranks; walking the live FantasyCalc value-vs-overall-rank curve
+   converts a rank into value units, so "2027 Mid 1st" and a player can sit in
+   the same trade column and mean the same thing. A pick-poor team cannot
+   afford to price its scarcest asset by feel. */
+function valueAtRank(rank) {
+  if (!S.rankCurve) {
+    S.rankCurve = Object.values(S.values)
+      .filter(e => e.v > 0 && e.ovr != null)
+      .sort((a, b) => a.ovr - b.ovr).map(e => [e.ovr, e.v]);
+  }
+  const c = S.rankCurve;
+  if (!c.length) return 0;
+  if (rank <= c[0][0]) return c[0][1];
+  for (let i = 1; i < c.length; i++)
+    if (c[i][0] >= rank) {
+      const [r0, v0] = c[i-1], [r1, v1] = c[i];
+      return Math.round(v0 + (v1 - v0) * (rank - r0) / Math.max(1, r1 - r0));
+    }
+  return c[c.length - 1][1];
+}
+function pickPrice(season, round) {
+  const picks = S.sigMeta?.picks;
+  if (!picks) return null;
+  const key = leagueFormat().numQbs === 2 ? "e2" : "e1";
+  const ord = ["1st","2nd","3rd","4th"][round - 1];
+  // Next year's picks carry Early/Mid/Late tiers; the year after is one flat
+  // asset per round. Try tiered first, fall back to flat.
+  for (const name of [`${season} Mid ${ord}`, `${season} ${ord}`]) {
+    const p = picks[name];
+    if (p) return { name, v: valueAtRank(p[key]), ecr: p[key] };
+  }
+  return null;
+}
+/* Who owns which future picks: everyone owns their own, then traded_picks
+   reassigns. Slots are unknown before standings exist, so everything prices
+   at the Mid tier — stated, not hidden. */
+function pickOwnership() {
+  const cur = Number(S.league?.season || S.season);
+  const rounds = Math.min(4, S.league?.settings?.draft_rounds || 4);
+  const own = {};
+  for (const r of S.rosters) {
+    own[r.roster_id] = [];
+    for (let y = cur + 1; y <= cur + 3; y++)
+      for (let rd = 1; rd <= rounds; rd++)
+        own[r.roster_id].push({ season: String(y), round: rd, orig: r.roster_id });
+  }
+  for (const t of (S.tradedPicks || [])) {
+    const y = Number(t.season), rd = t.round;
+    if (y <= cur) continue;
+    const from = own[t.roster_id];        // original owner's slot
+    if (!from) continue;
+    const i = from.findIndex(p => p.season === String(y) && p.round === rd && p.orig === t.roster_id);
+    if (i >= 0) {
+      const [pk] = from.splice(i, 1);
+      (own[t.owner_id] ||= []).push(pk);
+    }
+  }
+  return own;
+}
+function pickAsset(pk) {
+  const pr = pickPrice(pk.season, pk.round);
+  if (!pr) return null;
+  const ord = ["1st","2nd","3rd","4th"][pk.round - 1];
+  return { kind: "pick", id: `pk_${pk.season}_${pk.round}_${pk.orig}`,
+    name: `${pk.season} ${ord}` + (pk.orig !== undefined ? ` (${teamName(pk.orig)})` : ""),
+    pos: "PICK", v: pr.v };
+}
+
+/* The plan dial. A dynasty price is a blend of this season and the seasons
+   after it; FantasyCalc publishes both halves (redraft value = now, dynasty
+   value ≈ the blend), so the future half is recoverable as max(0, 2·dyn − re).
+   planValue reweights the two halves by YOUR declared build instead of the
+   market's neutral mix. Not a prediction — a re-pricing of known numbers
+   against a stated goal, and the model is simple enough to argue with. */
+const PLANS = {
+  contend:  { w: 0.75, label: "Contend now",   why: "this season weighted 3:1 over the future" },
+  flexible: { w: 0.50, label: "Stay flexible", why: "the market's own even blend" },
+  rebuild:  { w: 0.25, label: "Youth rebuild", why: "the future weighted 3:1 over this season" },
+};
+function planValue(id) {
+  const e = S.values[id];
+  if (!e || !e.v) return null;
+  const now = e.rv || 0;
+  const future = Math.max(0, 2 * e.v - now);
+  const w = (PLANS[S.plan] || PLANS.flexible).w;
+  return Math.round(w * now + (1 - w) * future) * 2 / 2;
+}
+function planRead(id) {
+  const pv = planValue(id), e = S.values[id];
+  if (pv == null || !e.v || S.plan === "flexible") return null;
+  const d = (pv - e.v) / e.v;
+  if (Math.abs(d) < 0.12) return null;
+  const p = PLANS[S.plan];
+  return { pv, d, txt: (d > 0 ? "+" : "") + Math.round(d * 100) + "% to plan",
+    cls: d > 0 ? "buy" : "sell",
+    why: `Worth ${fmt(pv)} to a "${p.label}" build (${p.why}) against a market price of ${fmt(e.v)} — ` +
+      (d > 0 ? "your plan values him above the market; that spread is what you shop for."
+             : "your plan values him below his price; someone else should pay it.") };
+}
+
+/* This week's depth-chart movement — the freshest signal in the app. A rank
+   that rose, or a team change, days before the market reprices it. */
+function depthDelta(id) {
+  const dc = S.sig?.[id]?.dc;
+  if (!dc?.prev) return null;
+  const moved = dc.prev.team !== dc.team;
+  const rose = !moved && dc.prev.rank > dc.rank;
+  const cleared = rose && dc.rank <= 2 && dc.prev.rank >= 3;
+  if (moved) return { cls: "hold", txt: "NEW TEAM", big: true,
+    why: `Moved from ${dc.prev.team} to ${dc.team} this week — a new depth chart and a new price question.` };
+  if (cleared) return { cls: "diamond", txt: `PATH ↑ ${dc.pos}${dc.rank}`, big: true,
+    why: `Climbed from ${dc.pos}${dc.prev.rank} to ${dc.pos}${dc.rank} on ${dc.team} within the last week. A path just cleared, and the market usually takes days to notice.` };
+  if (rose) return { cls: "buy", txt: `↑ ${dc.pos}${dc.prev.rank}→${dc.rank}`, big: false,
+    why: `Rose ${dc.pos}${dc.prev.rank} to ${dc.pos}${dc.rank} on ${dc.team} this week.` };
+  return { cls: "sell", txt: `↓ ${dc.pos}${dc.prev.rank}→${dc.rank}`, big: false,
+    why: `Fell ${dc.pos}${dc.prev.rank} to ${dc.pos}${dc.rank} on ${dc.team} this week.` };
+}
+
+/* The market's explicit price for youth: redraft value (this season only) over
+   dynasty value (the career). The ratio itself is a fact, not a theory — both
+   numbers come from the same trade market. What's only SUGGESTIVE is the
+   exploit: value-matched vets out-produced their dynasty price in all three
+   windows tested, but never past the permutation court (p 0.09-0.23). */
+function ageTax(id) {
+  const e = S.values[id];
+  if (!e || !e.v || !e.rv || e.v < 300) return null;
+  const ratio = e.rv / e.v;
+  if (ratio >= 1.15) return { cls: "buy", txt: "WIN-NOW +" + Math.round((ratio - 1) * 100) + "%", ratio,
+    why: `Worth ${Math.round((ratio - 1) * 100)}% more for this season alone than his full dynasty price — the market is discounting his future hard. In the three windows tested, vets priced like this out-produced their cost every time (though never past the chance bar), and for a team competing now the discount is the point.` };
+  if (ratio <= 0.65) return { cls: "sell", txt: "FUTURE " + Math.round((1 - ratio) * 100) + "%", ratio,
+    why: `${Math.round((1 - ratio) * 100)}% of his dynasty price is a bet on seasons he hasn't played yet — you're buying years, not points. Fine for a rebuild; expensive for a team trying to win now.` };
+  return null;
+}
+
+/* Seven years of price, drawn. Values are share of the total market (basis
+   points), because the raw value scale inflates across eras — a share chart is
+   the honest shape of a career. Inline SVG, themed by CSS variables. */
+function histChart(ids, w = 340, h = 96) {
+  const COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
+  const sers = ids.map(id => S.risk?.[id]?.hist || []).filter(hh => hh.length >= 6);
+  if (!sers.length) return null;
+  const t = (d) => Date.parse("20" + d);
+  const allT = sers.flat().map(p => t(p[0]));
+  const allV = sers.flat().map(p => p[1]);
+  const t0 = Math.min(...allT), t1 = Math.max(...allT);
+  const v1 = Math.max(...allV) * 1.05 || 1;
+  const X = (tt) => 4 + (w - 8) * (tt - t0) / Math.max(1, t1 - t0);
+  const Y = (v) => h - 4 - (h - 12) * v / v1;
+  let paths = "";
+  sers.forEach((hh, i) => {
+    const pts = hh.map(p => `${X(t(p[0])).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+    paths += `<polyline points="${pts}" fill="none" stroke="${COLORS[i % 4]}" stroke-width="1.8" stroke-linejoin="round"/>`;
+  });
+  const yrs = [];
+  for (let y = new Date(t0).getFullYear() + 1; y <= new Date(t1).getFullYear(); y++) {
+    const x = X(Date.parse(`${y}-01-01`));
+    yrs.push(`<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${h}" stroke="var(--grid)" stroke-width="1"/>` +
+             `<text x="${(x + 3).toFixed(1)}" y="${h - 3}" fill="var(--ink-muted)" font-size="8">${y}</text>`);
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;display:block;margin:6px 0 2px">${yrs.join("")}${paths}</svg>` +
+    `<div style="font-size:10px;color:var(--ink-muted);margin-bottom:6px">market share of total dynasty value, weekly since ` +
+    `${new Date(t0).getFullYear()} (recent year weekly, older monthly) · DynastyProcess history</div>`;
+}
+
+/* Everything the app knows about one player, as sentences. Assembled in one
+   place so the board, the wire and the roster all explain themselves identically. */
+function fullRead(id, extra) {
+  const name = S.values[id]?.name || pinfo(id).n;
+  const parts = [];
+  const push = (s) => { if (s) parts.push(`<div class="tt-row"><span>${esc(s)}</span></div>`); };
+  const o = opportunity(id), l = luckRead(id), t = usageTrend(id),
+        a = ageRead(id), d = draftRead(id), ph = postHype(id),
+        pj = projection(id), ms = marketSplit(id), sc = successionRead(id),
+        rk = riskRead(id), at = ageTax(id), dd = depthDelta(id),
+        pl = planRead(id);
+  push(edgeTag(id).why);
+  if (dd && dd.big) push(dd.why);         // freshest first — this week's news leads
+  if (pj) push(pj.why);
+  if (ms && ms.dir !== "agree") push(ms.why);
+  if (o) push(o.why);
+  if (l) push(l.why);
+  if (t && t.big) push(t.why);
+  if (a) push(a.why);
+  if (d && !S.edges[id]?.gp) push(null);            // already said in the tag
+  else if (d && d.strong) push(d.why);
+  if (ph) push(ph.why);
+  if (sc) push(sc.why);
+  if (rk && rk.cls !== "hold") push(rk.why);
+  if (at) push(at.why);
+  if (dd && !dd.big) push(dd.why);
+  if (pl) push(pl.why);
+  (extra || []).forEach(push);
+  const chart = histChart([id]) || "";
+  return `<div class="tt-title">${esc(name)}</div>` + chart + parts.join("");
+}
+const edgeCell = (id) => {
+  const e = S.edges[id];
+  if (!e || e.edge == null) return '<span style="color:var(--ink-muted)">—</span>';
+  const s = e.edge > 0 ? "+" : "";
+  return `<span class="${e.edge > 0 ? "edge-pos" : e.edge < 0 ? "edge-neg" : ""}">${s}${fmt(e.edge)}</span>`;
+};
+
+/* =============================== derived =============================== */
+function teamName(rid) {
+  const roster = S.rosters.find(r => r.roster_id === rid);
+  const u = S.lusers.find(u => u.user_id === roster?.owner_id);
+  return u?.metadata?.team_name || u?.display_name || `Roster ${rid}`;
+}
+function starterValue(roster) {
+  const slots = (S.league?.roster_positions || []).filter(s => !["BN","IR","TAXI"].includes(s));
+  const pool = new Map((roster.players || []).filter(id => id && id !== "0")
+    .map(id => [id, { pos: pinfo(id).p, v: val(id) }]));
+  // Single-position slots claim first, flexes after, best value wins each slot.
+  const order = [...slots].sort((a,b) =>
+    (POS_SLOTS[a]?.length || 9) - (POS_SLOTS[b]?.length || 9));
+  let total = 0;
+  for (const slot of order) {
+    const ok = POS_SLOTS[slot]; if (!ok) continue;
+    let best = null;
+    for (const [id, p] of pool) if (ok.includes(p.pos) && (!best || p.v > pool.get(best).v)) best = id;
+    if (best) { total += pool.get(best).v; pool.delete(best); }
+  }
+  return total;
+}
+function teamSummaries() {
+  return S.rosters.map(r => {
+    const ids = (r.players || []).filter(id => id && id !== "0");
+    const byPos = { QB:0, RB:0, WR:0, TE:0, OTH:0 };
+    const assets = [];
+    let ageWt = 0, ageV = 0;
+    for (const id of ids) {
+      const p = pinfo(id), v = val(id);
+      byPos[GROUPS.includes(p.p) ? p.p : "OTH"] += v;
+      assets.push({ id, name: p.n, pos: p.p, v });
+      if (p.a && v) { ageWt += p.a * v; ageV += v; }
+    }
+    assets.sort((a,b) => b.v - a.v);
+    const total = Object.values(byPos).reduce((a,b) => a+b, 0);
+    return { rid: r.roster_id, name: teamName(r.roster_id), roster: r, total, byPos,
+      starters: starterValue(r), assets, age: ageV ? ageWt/ageV : null,
+      me: r.roster_id === S.myRosterId };
+  }).sort((a,b) => b.total - a.total);
+}
+
+/* =============================== trade finder =============================== */
+/* Same slot-fill as starterValue, but keeping the position breakdown instead of
+   collapsing it to one number — this is what "need" and "surplus" are measured
+   against. A team's starter total can look fine while it's one hit away from a
+   hole at RB2; the aggregate hides exactly the thing a trade would fix. */
+function rosterBreakdown(roster) {
+  const slots = (S.league?.roster_positions || []).filter(s => !["BN","IR","TAXI"].includes(s));
+  const pool = new Map((roster.players || []).filter(id => id && id !== "0")
+    .map(id => [id, { pos: pinfo(id).p, v: val(id) }]));
+  const order = [...slots].sort((a,b) => (POS_SLOTS[a]?.length || 9) - (POS_SLOTS[b]?.length || 9));
+  const starterByPos = { QB:0, RB:0, WR:0, TE:0 }, starterIds = new Set();
+  for (const slot of order) {
+    const ok = POS_SLOTS[slot]; if (!ok) continue;
+    let best = null;
+    for (const [id, p] of pool) if (ok.includes(p.pos) && (!best || p.v > pool.get(best).v)) best = id;
+    if (best) { const p = pool.get(best);
+      if (GROUPS.includes(p.pos)) starterByPos[p.pos] += p.v;
+      starterIds.add(best); pool.delete(best); }
+  }
+  const benchByPos = { QB:0, RB:0, WR:0, TE:0 }, benchDepth = { QB:0, RB:0, WR:0, TE:0 };
+  for (const [id, p] of pool) if (GROUPS.includes(p.pos)) {
+    benchByPos[p.pos] += p.v;
+    if (p.v >= 500) benchDepth[p.pos]++;         // rosterable, not deep-bench noise
+  }
+  return { starterByPos, benchByPos, benchDepth, starterIds };
+}
+
+function leagueNeeds() {
+  const teams = S.rosters.map(r => ({ rid: r.roster_id, bd: rosterBreakdown(r) }));
+  const median = (arr) => { const s = [...arr].sort((a,b) => a-b), n = s.length;
+    return n ? (n % 2 ? s[(n-1)/2] : (s[n/2-1] + s[n/2]) / 2) : 0; };
+  const med = {};
+  for (const g of GROUPS) med[g] = median(teams.map(t => t.bd.starterByPos[g] || 0));
+  return { med, byTeam: Object.fromEntries(teams.map(t => [t.rid, t.bd])) };
+}
+
+/* Contender / fringe / rebuilder, from roster shape rather than record — a
+   startup dynasty league has no games played yet, so wins can't classify
+   anyone. A team built to win now stacks starter value; a team building for
+   later stockpiles youth. Both are visible before a single snap is played. */
+function teamArchetype(rid, teams) {
+  const n = teams.length;
+  const t = teams.find(x => x.rid === rid);
+  if (!t) return null;
+  const starterRank = [...teams].sort((a,b) => b.starters - a.starters).findIndex(x => x.rid === rid) + 1;
+  const ageRank = [...teams].filter(x => x.age).sort((a,b) => a.age - b.age).findIndex(x => x.rid === rid) + 1;
+  if (starterRank <= Math.ceil(n/3)) return { cls: "contender", why: `#${starterRank} of ${n} in starter value` };
+  if (t.age && ageRank <= Math.ceil(n/3) && starterRank > Math.ceil(n*2/3))
+    return { cls: "rebuilder", why: `#${starterRank} in starters but the youngest core in the league` };
+  return { cls: "fringe", why: `#${starterRank} of ${n} — not clearly buying or selling` };
+}
+
+/* One trade package between my team and one opponent. Tries 1-for-1 first,
+   then a 2-for-1 consolidation (your depth for their one difference-maker) —
+   the shape a pick-poor team actually needs, since you can't buy up with picks
+   you don't have. Every candidate is scored on three things: does the value
+   check out, does it fill an actual hole on both sides, and does it move Edge
+   in the acquirer's favor. Fairness dominates the score; edge and need only
+   break ties, because a "great edge" trade nobody would accept is not a trade. */
+function bestPackage(myRid, oppRid, needs) {
+  const myBd = needs.byTeam[myRid], opBd = needs.byTeam[oppRid];
+  if (!myBd || !opBd) return null;
+  const myRoster = S.rosters.find(r => r.roster_id === myRid);
+  const opRoster = S.rosters.find(r => r.roster_id === oppRid);
+  const need = (bd, g) => bd.starterByPos[g] < needs.med[g] * 0.85;
+  const surplus = (bd, g) => bd.benchDepth[g] >= 2 || bd.starterByPos[g] > needs.med[g] * 1.15;
+
+  const rosterAssets = (roster, excludeStarters) => (roster.players || [])
+    .filter(id => id && id !== "0" && GROUPS.includes(pinfo(id).p) && val(id) >= 300)
+    .map(id => ({ id, pos: pinfo(id).p, v: val(id), tag: edgeTag(id).cls,
+                  starter: rosterBreakdown(roster).starterIds.has(id) }))
+    .filter(a => !excludeStarters || true);       // starters stay eligible; casual leagues trade them
+
+  const getPool = rosterAssets(opRoster).sort((a,b) => {
+    const pref = { diamond:3, buy:2, rental:1 }; return (pref[b.tag]||0) - (pref[a.tag]||0) || b.v - a.v; });
+  const givePool = rosterAssets(myRoster).sort((a,b) => {
+    const pref = { sell:3, hold:2, watch:1 }; return (pref[b.tag]||0) - (pref[a.tag]||0) || b.v - a.v; })
+    .filter(a => a.tag !== "diamond");             // don't offer away your own mispriced gems
+
+  const myDeficit = GROUPS.filter(g => need(myBd, g));
+  const opDeficit = GROUPS.filter(g => need(opBd, g));
+  const opSurplusForMe = GROUPS.filter(g => myDeficit.includes(g) && surplus(opBd, g));
+  const mySurplusForThem = GROUPS.filter(g => opDeficit.includes(g) && surplus(myBd, g));
+
+  const score = (give, get) => {
+    const gv = give.reduce((s,x) => s+x.v, 0), tv = get.reduce((s,x) => s+x.v, 0);
+    if (!gv || !tv) return null;
+    const fair = 1 - Math.abs(gv-tv) / Math.max(gv,tv);
+    if (fair < 0.72) return null;                  // too lopsided to be a real proposal
+    const edgeGain = get.reduce((s,x) => s + (S.edges[x.id]?.edge || 0), 0)
+                    - give.reduce((s,x) => s + (S.edges[x.id]?.edge || 0), 0);
+    const needFit = (get.some(x => myDeficit.includes(x.pos)) ? 1 : 0)
+                   + (give.some(x => opDeficit.includes(x.pos)) ? 1 : 0);
+    return { give, get, gv, tv, fair, edgeGain, needFit,
+      s: fair*1000 + Math.max(-1500, Math.min(1500, edgeGain))*0.3 + needFit*350 };
+  };
+
+  const candidates = [];
+  const getFrom = (pos) => getPool.filter(x => !pos.length || pos.includes(x.pos));
+  const giveFrom = (pos) => givePool.filter(x => !pos.length || pos.includes(x.pos));
+  // Need-matched and unfiltered lists overlap by construction — a need-matched
+  // player IS also in the unfiltered pool — so concatenating them puts the same
+  // id at two array indices. Deduping by id before pairing is what stops the
+  // 2-for-1 search from "trading" a player for himself.
+  const dedupe = (list) => { const seen = new Set();
+    return list.filter(x => seen.has(x.id) ? false : (seen.add(x.id), true)); };
+
+  // 1-for-1, need-matched first, falling back to any reasonable value match
+  const oneForOneGets = dedupe(getFrom(opSurplusForMe).slice(0, 6).concat(getFrom([]).slice(0, 4)));
+  const oneForOneGives = dedupe(giveFrom(mySurplusForThem).slice(0, 6).concat(giveFrom([]).slice(0, 4)));
+  for (const get of oneForOneGets) {
+    for (const give of oneForOneGives) {
+      if (give.id === get.id) continue;
+      const r = score([give], [get]); if (r) candidates.push(r);
+    }
+  }
+  // 2-for-1: my two depth pieces for their one difference-maker
+  const bigGets = dedupe(getFrom(opSurplusForMe).slice(0, 4).concat(getFrom([]).slice(0, 3)));
+  const smallGives = dedupe(giveFrom(mySurplusForThem).concat(giveFrom([])))
+    .filter(x => !x.starter || x.v < 3500);
+  for (const get of bigGets) {
+    for (let i = 0; i < smallGives.length; i++) for (let j = i+1; j < smallGives.length; j++) {
+      const a = smallGives[i], b = smallGives[j];
+      if (a.id === get.id || b.id === get.id) continue;
+      const r = score([a,b], [get]); if (r) candidates.push(r);
+    }
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a,b) => b.s - a.s);
+  return candidates[0];
+}
+
+/* Across the whole league: one best idea per opponent, ranked. This is the
+   "every team" sweep — it does not stop at the first good-looking trade, it
+   checks all of them and surfaces the strongest. */
+function generateTradeIdeas() {
+  if (!S.myRosterId) return [];
+  const teams = teamSummaries();
+  const needs = leagueNeeds();
+  const myArch = teamArchetype(S.myRosterId, teams);
+  const ideas = [];
+  const own = pickOwnership();
+  // If a package is close but light on one side, a future pick is the natural
+  // balancer — it's how real dynasty deals actually clear.
+  const sweeten = (pkg, myRid, oppRid) => {
+    const gap = pkg.tv - pkg.gv;                     // positive: I owe value
+    if (Math.abs(gap) / Math.max(pkg.gv, pkg.tv) < 0.06) return pkg;
+    const fromRid = gap > 0 ? myRid : oppRid;
+    const picks = (own[fromRid] || []).map(pickAsset).filter(Boolean)
+      .sort((a, b) => Math.abs(Math.abs(gap) - a.v) - Math.abs(Math.abs(gap) - b.v));
+    const pk = picks[0];
+    if (!pk || pk.v > Math.abs(gap) * 2.2) return pkg;
+    const give = gap > 0 ? [...pkg.give, pk] : pkg.give;
+    const get = gap > 0 ? pkg.get : [...pkg.get, pk];
+    const gv = give.reduce((s, x) => s + x.v, 0), tv = get.reduce((s, x) => s + x.v, 0);
+    const fair = 1 - Math.abs(gv - tv) / Math.max(gv, tv);
+    if (fair <= pkg.fair + 0.03) return pkg;
+    return { ...pkg, give, get, gv, tv, fair, sweetened: pk.name,
+      s: pkg.s + (fair - pkg.fair) * 1000 };
+  };
+  for (const t of teams) {
+    if (t.rid === S.myRosterId) continue;
+    if (!(t.roster.players || []).length) continue;    // nothing to trade for
+    let pkg = bestPackage(S.myRosterId, t.rid, needs);
+    if (pkg) pkg = sweeten(pkg, S.myRosterId, t.rid);
+    if (pkg) ideas.push({ oppRid: t.rid, oppName: t.name,
+      oppArch: teamArchetype(t.rid, teams), ...pkg });
+  }
+  ideas.sort((a,b) => b.s - a.s);
+  return { ideas, myArch, needs, teams };
+}
+
+/* =============================== tooltip =============================== */
+const tt = $("#tooltip");
+/* A docked reading panel, not a cursor-chasing tooltip. The reads grew into
+   paragraphs, and a paragraph glued to the pointer sits on top of the exact
+   rows being compared — so it opens on click, in the corner, and stays put. */
+function showTT(html, ev) {
+  tt.innerHTML = '<button class="tt-close" title="Close">✕</button>' + html;
+  tt.querySelector(".tt-close").addEventListener("click", hideTT);
+  tt.style.display = "block";
+}
+function hideTT() { tt.style.display = "none"; }
+tt.addEventListener("click", ev => ev.stopPropagation());   // clicks inside don't dismiss
+
+/* =============================== views =============================== */
+function setStatus(msg) { const s = $("#status");
+  if (!msg) { s.classList.add("hidden"); return; }
+  s.classList.remove("hidden"); s.innerHTML = `<span class="spin"></span>${esc(msg)}`; }
+function banner(msg, isErr) { $("#banner").innerHTML = msg
+  ? `<div class="banner${isErr ? " err" : ""}">${msg}</div>` : ""; }
+
+function render() {
+  const v = $("#view"); v.innerHTML = "";
+  document.querySelectorAll("nav.tabs button").forEach(b =>
+    b.classList.toggle("on", b.dataset.tab === S.tab));
+  if (!S.league) return;
+  ({ power: renderPower, rosters: renderRosters, players: renderPlayers, draft: renderDraft, board: renderBoard,
+     tradefinder: renderTradeFinder, trade: renderTrade, freeagents: renderFreeAgents,
+     standings: renderStandings, market: renderMarket }[S.tab])(v);
+}
+
+/* ---------- power rankings ---------- */
+function renderPower(v) {
+  const teams = teamSummaries();
+  const mine = teams.find(t => t.me);
+  const sr = [...teams].sort((a,b) => b.starters - a.starters);
+  const stats = el("div", "statrow");
+  if (mine) {
+    stats.append(
+      statTile("Your team value", fmt(mine.total), `#${teams.indexOf(mine)+1} of ${teams.length} overall`),
+      statTile("Your starters", fmt(mine.starters), `#${sr.indexOf(mine)+1} starting lineup`),
+      statTile("Weighted age", mine.age ? mine.age.toFixed(1) : "—",
+        mine.age ? (mine.age < avgAge(teams) ? "younger than league avg" : "older than league avg") : ""),
+      statTile("Top asset", mine.assets[0] ? mine.assets[0].name : "—",
+        mine.assets[0] ? `${fmt(mine.assets[0].v)} — ${esc(mine.assets[0].pos)}` : ""));
+  }
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Roster value power rankings"),
+    el("div", "sub", "Total roster value by position group — tap a segment for the pieces"));
+  const legend = el("div", "legend");
+  for (const g of GROUPS) legend.append(el("span", "key",
+    `<span class="swatch" style="background:var(${GROUP_VARS[g]})"></span>${g}`));
+  legend.append(el("span", "key",
+    `<span class="swatch" style="background:var(--baseline)"></span>Other`));
+  card.append(legend);
+
+  const max = Math.max(...teams.map(t => t.total), 1);
+  teams.forEach((t, i) => {
+    const row = el("div", "prow");
+    row.append(el("div", "rank", String(i+1)),
+      el("div", "team", esc(t.name) + (t.me ? '<span class="you">YOU</span>' : "")));
+    const bar = el("div", "bar");
+    const segs = [...GROUPS.map(g => [g, t.byPos[g], `var(${GROUP_VARS[g]})`]),
+                  ["Other", t.byPos.OTH, "var(--baseline)"]].filter(s => s[1] > 0);
+    for (const [g, amt, color] of segs) {
+      const seg = el("div", "segm");
+      seg.style.width = (amt / max * 100) + "%";
+      seg.style.background = color;
+      const top = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "Other") === g).slice(0, 3);
+      const html = `<div class="tt-title">${esc(t.name)} — ${g}: ${fmt(amt)}</div>` +
+        top.map(a => `<div class="tt-row"><span>${esc(a.name)}</span><span>${fmt(a.v)}</span></div>`).join("");
+      // Touch has no hover: tap a segment to pin the same tooltip.
+      seg.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+      seg.style.cursor = "pointer";
+      bar.append(seg);
+    }
+    row.append(bar, el("div", "val", fmt(t.total)));
+    card.append(row);
+  });
+  v.append(card);
+}
+function statTile(lab, valTxt, sub) {
+  const s = el("div", "stat");
+  s.append(el("div", "lab", esc(lab)), el("div", "val", esc(valTxt)), el("div", "sub", sub || ""));
+  return s;
+}
+const avgAge = (teams) => { const withAge = teams.filter(t => t.age);
+  return withAge.reduce((a,t) => a + t.age, 0) / (withAge.length || 1); };
+
+/* ---------- rosters ---------- */
+function renderRosters(v) {
+  const teams = teamSummaries();
+  const sel = el("select");
+  teams.forEach(t => { const o = el("option", null,
+    esc(t.name) + (t.me ? " (you)" : "")); o.value = t.rid; sel.append(o); });
+  sel.value = (S.rosterView ?? (teams.find(t => t.me) || teams[0]).rid);
+  S.rosterView = Number(sel.value);
+  sel.addEventListener("change", () => { S.rosterView = Number(sel.value); render(); });
+  const bar = el("div", "controls"); bar.append(sel); v.append(bar);
+
+  const t = teams.find(x => x.rid === S.rosterView) || teams[0];
+  const starterIds = new Set((t.roster.starters || []).filter(id => id && id !== "0"));
+  const card = el("div", "card");
+  card.append(el("h2", null, esc(t.name)),
+    el("div", "sub", `${fmt(t.total)} total · ${fmt(t.starters)} starters · ` +
+      (t.age ? `${t.age.toFixed(1)} value-weighted age` : "age n/a")));
+  const maxV = Math.max(...t.assets.map(a => a.v), 1);
+  const tbl = el("table", "posgroup");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
+    <th class="num">Pos rk</th><th style="width:20%">Value</th><th class="num">Pts/gm</th>
+    <th class="num">Proj</th><th class="num">Mkt gap</th>
+    <th class="num">Edge</th><th class="num">30d</th><th>Risk</th><th>Read</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const g of [...GROUPS, "OTH"]) {
+    const rows = t.assets.filter(a => (GROUPS.includes(a.pos) ? a.pos : "OTH") === g);
+    if (!rows.length) continue;
+    tb.append(el("tr", null, `<td class="gh" colspan="12">${g === "OTH" ? "Other" : g}</td>`));
+    for (const a of rows) {
+      const p = pinfo(a.id), fcv = S.values[a.id];
+      const e = S.edges[a.id], tag = edgeTag(a.id);
+      const tr30 = fcv?.tr || 0;
+      const trTxt = !tr30 ? '<span style="color:var(--ink-muted)">·</span>'
+        : `<span class="${tr30 > 0 ? "delta-up" : "delta-down"}">${tr30 > 0 ? "▲" : "▼"} ${fmt(Math.abs(tr30))}</span>`;
+      const row = el("tr", null,
+        `<td>${esc(a.name)}${starterIds.has(a.id) ? ' <span class="posbadge">ST</span>' : ""}</td>
+         <td>${esc(p.t || "FA")}</td><td class="num">${p.a ?? "—"}</td>
+         <td class="num">${fcv?.pr ? esc((fcv.pos || p.p) + fcv.pr) : "—"}</td>
+         <td><span class="meter"><span class="track"><span class="fill" style="width:${a.v/maxV*100}%"></span></span>
+             <span class="mval">${a.v ? fmt(a.v) : "—"}</span></span></td>
+         <td class="num">${e?.ppg ? e.ppg.toFixed(1) : "—"}</td>
+         <td class="num">${(() => { const pj = projection(a.id); return pj
+            ? `<b>${pj.ppg.toFixed(1)}</b>` : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
+         <td class="num">${(() => { const ms = marketSplit(a.id); return ms && ms.dir !== "agree"
+            ? `<span class="${ms.gap < 0 ? "edge-pos" : "edge-neg"}">${esc(ms.txt)}</span>`
+            : '<span style="color:var(--ink-muted)">·</span>'; })()}</td>
+         <td class="num">${GROUPS.includes(a.pos) ? edgeCell(a.id) : '<span style="color:var(--ink-muted)">—</span>'}</td>
+         <td class="num">${trTxt}</td>
+         <td>${(() => { const rk = riskRead(a.id); return rk
+            ? `<span class="tag ${rk.cls === "buy" ? "buy" : rk.cls === "sell" ? "sell" : "hold"}">${esc(rk.txt)}</span>`
+            : ""; })()}</td>
+         <td>${GROUPS.includes(a.pos) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>${postHype(a.id) ? ' <span class="tag diamond">PH</span>' : ""}` : ""}</td>`);
+      if (GROUPS.includes(a.pos)) {
+        const html = fullRead(a.id);
+        row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+      }
+      tb.append(row);
+    }
+  }
+  tbl.append(tb); card.append(tbl); v.append(card);
+
+  // ---- construction grade: the shape of the roster, not the sum of it ----
+  // A team can have good total value and still be built wrong: all its WR
+  // value aging out together, or half its price in FRAGILE assets. This is
+  // the portfolio view of the team selected above.
+  const ids = (t.roster.players || []).filter(id => id && id !== "0" && GROUPS.includes(pinfo(id).p));
+  if (ids.length) {
+    const gc = el("div", "card");
+    gc.append(el("h2", null, "Construction grade"),
+      el("div", "sub", `How ${esc(t.name)} is built — value-weighted age by position, value past the age cliff, and price-path risk.`));
+    const notes = [];
+    const rowsHtml = [];
+    for (const g of GROUPS) {
+      const gp = ids.filter(id => pinfo(id).p === g && val(id) > 0);
+      if (!gp.length) { rowsHtml.push(`<tr><td>${g}</td><td colspan="4" style="color:var(--ink-muted)">no value held</td></tr>`); continue; }
+      const tot = gp.reduce((s,id) => s + val(id), 0);
+      let w = 0, cliffV = 0, fragile = 0;
+      for (const id of gp) {
+        const a = pinfo(id).a, vv = val(id);
+        if (a) { w += a * vv;
+          const c = CURVES[g];
+          if (c && a >= c.cliff - 1) cliffV += vv; }
+        if (riskRead(id)?.txt === "FRAGILE") fragile++;
+      }
+      const avgAge = w / tot;
+      const cliffPct = cliffV / tot * 100;
+      rowsHtml.push(`<tr><td>${g}</td><td class="num">${fmt(tot)}</td>
+        <td class="num">${avgAge ? avgAge.toFixed(1) : "—"}</td>
+        <td class="num"><span class="${cliffPct > 40 ? "edge-neg" : ""}">${cliffPct.toFixed(0)}%</span></td>
+        <td class="num">${fragile}</td></tr>`);
+      if (cliffPct > 40) notes.push(`${cliffPct.toFixed(0)}% of the ${g} value is at or near the age cliff — that value is on a timer, and it all expires together.`);
+      if (fragile >= 2) notes.push(`${fragile} FRAGILE assets at ${g} — price paths choppier than their peers'. One bad month hits them all at once.`);
+    }
+    const gt = el("table");
+    gt.innerHTML = `<thead><tr><th>Pos</th><th class="num">Value held</th><th class="num">Wtd age</th>
+      <th class="num">Near cliff</th><th class="num">Fragile</th></tr></thead><tbody>${rowsHtml.join("")}</tbody>`;
+    gc.append(gt);
+    gc.append(el("div", "sub", notes.length
+      ? notes.map(n => "⚠ " + esc(n)).join("<br>")
+      : "No structural warnings — value is spread across ages and risk tiers."));
+    v.append(gc);
+  }
+}
+
+/* ---------- trade calculator ---------- */
+function tradePool() {
+  const inLeague = new Map();
+  for (const r of S.rosters) for (const id of (r.players || []))
+    if (id && id !== "0") inLeague.set(id, teamName(r.roster_id));
+  const pool = [];
+  for (const [id, e] of Object.entries(S.values)) {
+    const p = pinfo(id);
+    pool.push({ kind:"player", id, name: e.name || p.n, pos: e.pos || p.p, v: e.v,
+      owner: inLeague.get(id) || null });
+  }
+  S.picks.forEach((pk, i) => pool.push({ kind:"pick", id:"pick"+i, name: pk.name, pos:"PICK", v: pk.v, owner:null }));
+  return pool.sort((a,b) => b.v - a.v);
+}
+/* Every signal this app has on one asset, compressed to a chip row. The trade
+   calculator is the tool this whole build points at — showing raw price here
+   and nothing else would mean everything upstream never reaches the moment
+   it's meant to inform. Picks and ungraded players get nothing; there's
+   nothing honest to show them yet. */
+function assetSignals(id) {
+  if (!S.edges[id]) return null;               // picks, or players with no edge record
+  const t = edgeTag(id), l = luckRead(id), a = ageRead(id), ms = marketSplit(id), ph = postHype(id);
+  return { t, l, a, ms, ph };
+}
+function sigChips(id) {
+  const s = assetSignals(id);
+  if (!s) return null;
+  const row = el("div", "sig-chips");
+  if (s.t && s.t.cls !== "hold" && s.t.cls !== "nosample")
+    row.append(el("span", `tag ${s.t.cls}`, esc(s.t.txt)));
+  if (s.l && s.l.cls !== "hold") row.append(el("span", `tag ${s.l.cls}`, esc(s.l.txt)));
+  if (s.a && ["diamond","sell"].includes(s.a.cls)) row.append(el("span", `tag ${s.a.cls}`, esc(s.a.txt)));
+  if (s.ms && s.ms.dir !== "agree") row.append(el("span", `tag ${s.ms.dir === "cheap-here" ? "buy" : "sell"}`,
+    `mkt ${esc(s.ms.txt)}`));
+  if (s.ph) row.append(el("span", "tag diamond", "POST-HYPE"));
+  return row.children.length ? row : null;
+}
+
+function renderTrade(v) {
+  const pool = tradePool();
+  const wrap = el("div", "grid2");
+  wrap.append(tradeSide("a", "Side A", pool), tradeSide("b", "Side B", pool));
+  v.append(wrap);
+
+  const a = S.trade.a.reduce((s,x) => s + x.v, 0), b = S.trade.b.reduce((s,x) => s + x.v, 0);
+  const card = el("div", "card verdict");
+  card.append(el("h2", null, "Verdict"));
+  if (!a && !b) card.append(el("div", "empty", "Add players or picks to both sides to compare."));
+  else {
+    // One note PER ASSET, not per bucket — edge and luck can legitimately point
+    // opposite ways on the same player (underpriced for his production, but
+    // that production was itself touchdown-lucky), and splitting them into
+    // separate buy/sell tallies made the same name appear on both lists in the
+    // same breath, which reads as a bug rather than the nuance it actually is.
+    const sideRead = (side, label) => {
+      const lines = [];
+      for (const x of S.trade[side]) {
+        const s = assetSignals(x.id);
+        if (!s) continue;
+        const bits = [];
+        if (["diamond","buy","rental"].includes(s.t.cls)) bits.push("underpriced for his production");
+        else if (s.t.cls === "sell") bits.push("overpriced for his production");
+        if (s.l?.cls === "sell") bits.push("touchdown-lucky last season");
+        else if (s.l?.cls === "buy") bits.push("touchdown-unlucky last season");
+        if (s.ms && s.ms.dir !== "agree")
+          bits.push(`priced ${s.ms.dir === "dear-here" ? "above" : "below"} the consensus market (${s.ms.txt})`);
+        if (s.ph) bits.push("fits the post-hype pattern — real capital, still young, forgotten by the market");
+        if (bits.length) lines.push(`${x.name}: ${bits.join("; ")}`);
+      }
+      if (!lines.length) return null;
+      const d = el("div", "sig-note");
+      d.append(el("b", null, esc(label) + " "));
+      lines.forEach((l, i) => { if (i) d.append(el("br")); d.append(document.createTextNode(l)); });
+      return d;
+    };
+    const rA = sideRead("a", "Side A"), rB = sideRead("b", "Side B");
+    if (rA || rB) {
+      const box = el("div", "sig-notes");
+      if (rA) box.append(rA); if (rB) box.append(rB);
+      card.append(box);
+    }
+    const total = a + b || 1;
+    const bar = el("div", "vbar");
+    const ad = el("div", "a"), bd = el("div", "b");
+    ad.style.width = (a/total*100) + "%"; bd.style.width = (b/total*100) + "%";
+    bar.append(ad, bd); card.append(bar);
+    card.append(el("div", "vlabels",
+      `<span><span class="swatch" style="background:var(--s1)"></span> Side A · ${fmt(a)}</span>
+       <span>Side B · ${fmt(b)} <span class="swatch" style="background:var(--s2)"></span></span>`));
+    const diff = Math.abs(a-b), pct = diff / Math.max(a,b) * 100;
+    const lead = a > b ? "Side A" : "Side B";
+    const msg = pct < 5 ? "Dead even — fair trade" :
+      pct < 12 ? `${lead} wins slightly` : `${lead} wins clearly`;
+    card.append(el("div", "vmsg",
+      `${esc(msg)}<span class="sub">difference ${fmt(diff)} (${pct.toFixed(1)}%)` +
+      (diff > 0 ? ` — ${a<b ? "Side A" : "Side B"} needs ~${fmt(diff)} more value to even it` : "") +
+      `</span>`));
+  }
+  v.append(card);
+
+  // The consequence, not just the fairness: simulate the swap on YOUR actual
+  // roster and show what changes. Only when both sides map to teams and your
+  // team is one of them — a hypothetical between two other teams isn't yours.
+  const tA = S.tradeTeam?.a, tB = S.tradeTeam?.b;
+  const mine = tA === S.myRosterId ? "a" : tB === S.myRosterId ? "b" : null;
+  const other = mine === "a" ? tB : mine === "b" ? tA : null;
+  if (mine && other != null && (S.trade.a.length || S.trade.b.length)) {
+    const outIds = S.trade[mine].filter(x => x.kind === "player").map(x => x.id);
+    const inIds = S.trade[mine === "a" ? "b" : "a"].filter(x => x.kind === "player").map(x => x.id);
+    if (outIds.length || inIds.length) {
+      const myRoster = S.rosters.find(r => r.roster_id === S.myRosterId);
+      const before = { total: 0, starters: starterValue(myRoster) };
+      const beforeIds = (myRoster.players || []).slice();
+      before.total = beforeIds.reduce((s, id) => s + val(id), 0);
+      const planBefore = beforeIds.reduce((s, id) => s + (planValue(id) ?? val(id)), 0);
+      // simulate
+      myRoster.players = beforeIds.filter(id => !outIds.includes(id)).concat(inIds);
+      const after = { total: myRoster.players.reduce((s, id) => s + val(id), 0),
+                      starters: starterValue(myRoster) };
+      const planAfter = myRoster.players.reduce((s, id) => s + (planValue(id) ?? val(id)), 0);
+      const ages = (ids) => { let w = 0, vsum = 0;
+        for (const id of ids) { const a = pinfo(id).a, vv = val(id);
+          if (a && vv) { w += a * vv; vsum += vv; } }
+        return vsum ? w / vsum : null; };
+      const ageB = ages(beforeIds), ageA = ages(myRoster.players);
+      myRoster.players = beforeIds;                        // restore, always
+      const delta = (a, b, unit="") => { const d = a - b;
+        return `<span class="${d > 0 ? "edge-pos" : d < 0 ? "edge-neg" : ""}">${d > 0 ? "+" : ""}${typeof d === "number" && unit === "y" ? d.toFixed(1) : fmt(d)}${unit === "y" ? " yrs" : ""}</span>`; };
+      const sc = el("div", "card");
+      sc.append(el("h2", null, "If you make this trade"),
+        el("div", "sub", `Your roster after the swap, against the "${(PLANS[S.plan]||PLANS.flexible).label}" plan. Picks change your capital but not these lineup numbers.`));
+      const rowdiv = el("div", "statrow");
+      rowdiv.append(
+        statTile("Starting lineup", fmt(after.starters), `was ${fmt(before.starters)} · ${delta(after.starters, before.starters)}`),
+        statTile("Total roster value", fmt(after.total), `was ${fmt(before.total)} · ${delta(after.total, before.total)}`),
+        statTile("Plan-adjusted value", fmt(planAfter), `was ${fmt(planBefore)} · ${delta(planAfter, planBefore)}`),
+        statTile("Value-weighted age", ageA ? ageA.toFixed(1) : "—",
+          ageB && ageA ? `was ${ageB.toFixed(1)} · ${delta(ageA, ageB, "y")}` : ""));
+      sc.append(rowdiv);
+      v.append(sc);
+    }
+  }
+}
+function tradeSide(side, label, pool) {
+  const box = el("div", "tside");
+  box.append(el("h3", null,
+    `<span class="swatch" style="background:var(${side === "a" ? "--s1" : "--s2"})"></span>${label}`));
+  const search = el("div", "tsearch");
+  const inp = el("input"); inp.placeholder = "Search players or picks…";
+  const sugg = el("div", "sugg hidden");
+  inp.addEventListener("input", () => {
+    const q = inp.value.trim().toLowerCase();
+    sugg.innerHTML = ""; sugg.classList.toggle("hidden", q.length < 2);
+    if (q.length < 2) return;
+    const taken = new Set([...S.trade.a, ...S.trade.b].map(x => x.id));
+    pool.filter(p => !taken.has(p.id) && p.name.toLowerCase().includes(q)).slice(0, 8)
+      .forEach(p => {
+        const b = el("button", null,
+          `<span class="posbadge">${esc(p.pos)}</span> ${esc(p.name)}` +
+          (p.owner ? ` <span style="color:var(--ink-muted);font-size:11px">· ${esc(p.owner)}</span>` : "") +
+          `<span class="sv">${fmt(p.v)}</span>`);
+        b.addEventListener("click", () => { S.trade[side].push(p); render(); });
+        sugg.append(b);
+      });
+    if (!sugg.children.length) sugg.append(el("div", "empty", "No match"));
+  });
+  search.append(inp, sugg); box.append(search);
+
+  // Roster browser: Side A opens on YOUR team, Side B on a team you pick.
+  // A trade starts from what the two teams actually hold, not from a blank
+  // search box — the search stays for picks and edge cases.
+  if (!S.tradeTeam) S.tradeTeam = { a: S.myRosterId, b: null };
+  const teams = teamSummaries();
+  const sel = el("select");
+  sel.append(new Option(side === "b" ? "Browse a team…" : "—", ""));
+  teams.forEach(t => {
+    const o = new Option(t.name + (t.me ? " (you)" : ""), t.rid);
+    if (S.tradeTeam[side] === t.rid) o.selected = true;
+    sel.append(o);
+  });
+  sel.addEventListener("change", () => {
+    S.tradeTeam[side] = sel.value ? Number(sel.value) : null; render();
+  });
+  box.append(sel);
+  const rid = S.tradeTeam[side];
+  if (rid != null) {
+    const t = teams.find(x => x.rid === rid);
+    const taken = new Set([...S.trade.a, ...S.trade.b].map(x => x.id));
+    const list = el("div", "tpick");
+    const own = pickOwnership()[rid] || [];
+    const pickRows = own.map(pickAsset).filter(Boolean).filter(a => !taken.has(a.id))
+      .sort((a,b) => b.v - a.v);
+    const assets = (t?.assets || []).filter(a => !taken.has(a.id));
+    if (!assets.length && !pickRows.length) {
+      list.append(el("div", "empty",
+        (t?.assets || []).length ? "Everything here is already in the trade."
+          : `${t?.name || "This team"} has no players yet — the league hasn't drafted.`));
+    } else {
+      for (const a of assets.slice(0, 40)) {
+        const b = el("button", null,
+          `<span class="posbadge">${esc(a.pos)}</span> ${esc(a.name)}<span class="sv">${fmt(a.v)}</span>`);
+        b.addEventListener("click", () => {
+          S.trade[side].push({ kind: "player", id: a.id, name: a.name, pos: a.pos, v: a.v,
+            owner: t.name }); render();
+        });
+        list.append(b);
+      }
+      // The team's future picks, priced at the Mid tier (slots unknown until
+      // standings exist). For a pick-poor team these rows ARE the negotiation.
+      for (const a of pickRows) {
+        const b = el("button", null,
+          `<span class="posbadge">PICK</span> ${esc(a.name)}<span class="sv">${fmt(a.v)}</span>`);
+        b.addEventListener("click", () => { S.trade[side].push({ ...a, owner: t.name }); render(); });
+        list.append(b);
+      }
+    }
+    box.append(list);
+  }
+
+  S.trade[side].forEach((p, i) => {
+    const a = el("div", "asset",
+      `<span class="posbadge">${esc(p.pos)}</span> ${esc(p.name)}
+       <span class="av">${fmt(p.v)}</span>`);
+    const rm = el("button", "rm", "✕");
+    rm.addEventListener("click", () => { S.trade[side].splice(i, 1); render(); });
+    a.append(rm); box.append(a);
+    const chips = sigChips(p.id);
+    if (chips) {
+      const html = fullRead(p.id);
+      chips.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+      box.append(chips);
+    }
+  });
+  const sum = S.trade[side].reduce((s,x) => s + x.v, 0);
+  box.append(el("div", "total", sum ? fmt(sum) : ""));
+  return box;
+}
+
+/* What has actually been tested, stated plainly. Every signal here was replayed
+   against two independent one-year windows of DynastyProcess price history,
+   each call compared against players of similar starting value. One of the
+   three came back inconsistent, and saying so is the point: a tool that only
+   advertises its wins is not an analytics tool, it is a sales pitch. */
+function evidenceNote() {
+  const ev = S.sigMeta?.evidence;
+  const box = el("div", "evidence");
+  if (!ev) { box.append(el("div", "sub", "No backtest recorded in this data file.")); return box; }
+  box.append(el("div", "ev-h", "What has been measured — and what has not"));
+  const LABEL = { held:["buy","HELD UP"], failed:["sell","DID NOT"], modest:["hold","MODEST"],
+                  unproven:["nosample","UNPROVEN"], suggestive:["hold","SUGGESTIVE"] };
+  const row = (state, txt) => {
+    const [cls, txt2] = LABEL[state] || LABEL.modest;
+    const d = el("div", "ev-row");
+    d.append(el("span", `tag ${cls}`, txt2), el("span", null, esc(txt)));
+    box.append(d);
+  };
+  if (ev.edgeBuy) row(ev.edgeBuy.verdict === "unproven" ? "unproven" : "held", ev.edgeBuy.claim);
+  if (ev.tdLuckOnPoints) row("held", ev.tdLuckOnPoints.claim);
+  if (ev.tdLuckOnValue) row("failed", ev.tdLuckOnValue.claim +
+    " So use it to judge what a player will SCORE next season, not what the market will pay for him.");
+  if (ev.projection) row("modest", ev.projection.claim);
+  if (ev.marketShape) row("suggestive", ev.marketShape.claim);
+  if (ev.ageArb) row("suggestive", ev.ageArb.claim);
+  // Composed from the risk file itself so the words can never drift from the data.
+  const a = S.riskMeta?.arch;
+  if (a?.RB_elite && a?.WR_elite) row("held",
+    `Measured on ${S.riskMeta.snapshots} weekly value snapshots since 2019: elite RBs run ` +
+    `${(a.RB_elite.vol_med / a.WR_elite.vol_med).toFixed(1)}× the week-to-week turbulence of elite WRs, ` +
+    `with worse peak-to-trough slides (${(a.RB_elite.mdd_med*100).toFixed(0)}% vs ${(a.WR_elite.mdd_med*100).toFixed(0)}%), ` +
+    `and the same ordering holds one tier down. Only ${a.RB_elite.n} elite RBs exist, so the direction is solid and the magnitudes are soft. ` +
+    `Even elite WRs median a ${(a.WR_elite.mdd_med*100).toFixed(0)}% slide inside two years — nothing in dynasty is actually safe.`);
+  return box;
+}
+
+/* ---------- draft war room ---------- */
+/* Value over replacement, against THIS league's exact lineup. Replacement
+   level is what makes an 11-team 1QB league price players differently from
+   the 12-team superflex the big sites assume: the last startable QB here is
+   QB11, and everything above him is worth only what it clears that bar by.
+   Flex slots are split half RB / half WR — tight ends rarely win a flex spot
+   in practice; the assumption is stated here so it can be argued with. */
+function replacementLevels() {
+  const teams = S.league?.total_rosters || 11;
+  const slots = (S.league?.roster_positions || []).filter(s => !["BN","IR","TAXI"].includes(s));
+  const count = { QB:0, RB:0, WR:0, TE:0 };
+  for (const s of slots) {
+    if (count[s] !== undefined) count[s]++;
+    else if (POS_SLOTS[s]) {
+      if (s === "SUPER_FLEX") count.QB += 0.7, count.RB += 0.15, count.WR += 0.15;
+      else count.RB += 0.5, count.WR += 0.5;
+    }
+  }
+  const proj = {};
+  for (const [id, sg] of Object.entries(S.sig || {}))
+    if (sg.proj != null && GROUPS.includes(sg.pos)) (proj[sg.pos] ||= []).push(sg.proj);
+  const out = {};
+  for (const g of GROUPS) {
+    const n = Math.max(1, Math.round(teams * count[g]));
+    const arr = (proj[g] || []).sort((a,b) => b - a);
+    out[g] = { rank: n, ppg: arr[Math.min(n, arr.length) - 1] ?? 0 };
+  }
+  return out;
+}
+
+async function fetchDraftState() {
+  if (!S.league?.draft_id) { S.draftPicks = null; S.draftStatus = null; return; }
+  try {
+    const [draft, picks] = await Promise.all([
+      sleeper(`/draft/${S.league.draft_id}`),
+      sleeper(`/draft/${S.league.draft_id}/picks`)]);
+    S.draftStatus = draft?.status || null;
+    S.draftPicks = new Map((picks || []).map(p => [String(p.player_id),
+      { by: p.picked_by, round: p.round, no: p.pick_no }]));
+  } catch { S.draftPicks = null; S.draftStatus = null; }
+}
+
+function renderDraft(v) {
+  v.append(el("div", "status", '<span class="spin"></span>Loading draft state…'));
+  fetchDraftState().then(() => { if (S.tab === "draft") renderDraftInner(v); });
+  // A live draft moves; poll while the tab is open, stop the moment it isn't.
+  clearInterval(S.draftTimer);
+  if (S.draftStatus !== "complete")
+    S.draftTimer = setInterval(async () => {
+      if (S.tab !== "draft") { clearInterval(S.draftTimer); return; }
+      const before = S.draftPicks?.size || 0;
+      await fetchDraftState();
+      if ((S.draftPicks?.size || 0) !== before) render();
+    }, 15000);
+}
+
+function renderDraftInner(v) {
+  v.innerHTML = "";
+  const repl = replacementLevels();
+  const taken = S.draftPicks || new Map();
+  const userByRid = new Map(S.lusers.map(u => [u.user_id, u.display_name]));
+
+  const rows = [];
+  for (const [id, sg] of Object.entries(S.sig || {})) {
+    if (!GROUPS.includes(sg.pos)) continue;
+    if (S.faPos !== "ALL" && sg.pos !== S.faPos) continue;
+    const proj = sg.proj;
+    const vor = proj != null ? proj - repl[sg.pos].ppg : null;
+    const pk = taken.get(id);
+    if (proj == null && !val(id) && !sg.rookie) continue;
+    rows.push({ id, pos: sg.pos, proj, vor, pk,
+      name: S.values[id]?.name || pinfo(id).n, v: val(id) });
+  }
+  rows.sort((a,b) => (b.vor ?? -99) - (a.vor ?? -99) || b.v - a.v);
+
+  const avail = rows.filter(r => !r.pk);
+  const startable = {};
+  for (const g of GROUPS) startable[g] = avail.filter(r => r.pos === g && (r.vor ?? -1) > 0).length;
+
+  const bar = el("div", "controls");
+  ["ALL", ...GROUPS].forEach(g => {
+    const c = el("button", "chip" + (S.faPos === g ? " on" : ""), g);
+    c.addEventListener("click", () => { S.faPos = g; render(); });
+    bar.append(c);
+  });
+  bar.append(el("span", "head-spacer"),
+    el("span", "pill", S.draftStatus ? `draft: ${S.draftStatus.replace("_"," ")}` : "no draft found"),
+    el("span", "pill", `${taken.size} picks made`));
+  v.append(bar);
+
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Startable left", GROUPS.map(g => `${g} ${startable[g]}`).join(" · "),
+      "players projected above replacement, still on the board"),
+    statTile("Replacement level", GROUPS.map(g => `${g}${repl[g].rank}`).join(" · "),
+      `for this league's exact lineup (${S.league?.total_rosters} teams)`),
+    statTile("Picks tracked", taken.size ? "live" : "none yet",
+      taken.size ? "board updates every 15s during the draft" : "board shows the full pool"));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Draft board — value over replacement"),
+    el("div", "sub", "VOR = projected points per game above the last startable player at his position in THIS " +
+      "league. Flex counted half RB, half WR. Filter to one position to see its tier lines — each marks a " +
+      "full-point drop, the moment to stop waiting. Projections carry ±3.3 ppg of honest error; the tags are the tiebreakers."));
+  card.append(evidenceNote());
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>#</th><th>Player</th><th class="num">Age</th>
+    <th class="num">Proj</th><th class="num">VOR</th><th class="num">Value</th>
+    <th class="num">Plan</th><th>Age tax</th><th>Reads</th><th>Status</th></tr></thead>`;
+  const tb = el("tbody");
+  const shown = rows.slice(0, 140);
+  let lastVor = null, rank = 0;
+  for (const r of shown) {
+    rank++;
+    // Tier breaks only when a single position is filtered: on the ALL view
+    // positions interleave, so a gap between consecutive rows says nothing
+    // about any position's actual cliff.
+    if (S.faPos !== "ALL" && lastVor != null && r.vor != null && lastVor - r.vor >= 1.0)
+      tb.append(el("tr", null, `<td class="gh" colspan="10">— tier break: ${(lastVor - r.vor).toFixed(1)} ppg drop —</td>`));
+    if (r.vor != null) lastVor = r.vor;
+    const at = ageTax(r.id), tag = edgeTag(r.id), sc = successionRead(r.id);
+    const readBits = [];
+    if (!["hold","nosample"].includes(tag.cls)) readBits.push(`<span class="tag ${tag.cls}">${esc(tag.txt)}</span>`);
+    if (sc) readBits.push('<span class="tag diamond">DEV</span>');
+    if (postHype(r.id)) readBits.push('<span class="tag diamond">PH</span>');
+    const row = el("tr", r.pk ? "taken" : null,
+      `<td class="num">${rank}</td>
+       <td>${esc(r.name)} <span class="posbadge">${esc(r.pos)}</span></td>
+       <td class="num">${pinfo(r.id).a ?? "—"}</td>
+       <td class="num">${r.proj != null ? r.proj.toFixed(1) : "—"}</td>
+       <td class="num">${r.vor != null ? `<b class="${r.vor > 0 ? "edge-pos" : ""}">${r.vor > 0 ? "+" : ""}${r.vor.toFixed(1)}</b>` : "—"}</td>
+       <td class="num">${r.v ? fmt(r.v) : "—"}</td>
+       <td class="num">${(() => { const pv = planValue(r.id); if (pv == null || !r.v) return "—";
+          const d = (pv - r.v) / r.v;
+          return `<span class="${d > 0.12 ? "edge-pos" : d < -0.12 ? "edge-neg" : ""}">${fmt(pv)}</span>`; })()}</td>
+       <td>${at ? `<span class="tag ${at.cls}">${esc(at.txt)}</span>` : ""}</td>
+       <td>${readBits.join(" ")}</td>
+       <td>${r.pk ? `<span class="tag sell">R${r.pk.round} · ${esc(userByRid.get(r.pk.by) || "taken")}</span>`
+                  : '<span style="color:var(--ink-muted)">available</span>'}</td>`);
+    const html = fullRead(r.id);
+    row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(row);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub",
+    `Showing ${shown.length} of ${rows.length}. Players with no projection (rookies, injuries) sort by market value — ` +
+    `their draft-capital and development reads open on tap, which is where late-round picks live.`));
+  v.append(card);
+}
+
+/* ---------- players explorer ---------- */
+/* Every valued player in one searchable table, with side-by-side price-path
+   comparison — the "look a player up" surface a value site lives on. */
+function renderPlayers(v) {
+  if (!S.plState) S.plState = { q: "", pos: "ALL", sort: "value", cmp: [] };
+  const st = S.plState;
+
+  const bar = el("div", "controls");
+  const inp = el("input"); inp.placeholder = "Search players…"; inp.value = st.q;
+  inp.addEventListener("input", () => { st.q = inp.value; render();
+    setTimeout(() => { const i = document.querySelector("#view .controls input");
+      if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); });
+  bar.append(inp);
+  ["ALL", ...GROUPS].forEach(g => {
+    const c = el("button", "chip" + (st.pos === g ? " on" : ""), g);
+    c.addEventListener("click", () => { st.pos = g; render(); });
+    bar.append(c);
+  });
+  bar.append(el("span", "head-spacer"));
+  const seg = el("span", "seg");
+  [["value","Value"], ["trend","30-day"], ["proj","Proj"], ["age","Age"]].forEach(([k, lab]) => {
+    const b = el("button", st.sort === k ? "on" : null, lab);
+    b.addEventListener("click", () => { st.sort = k; render(); });
+    seg.append(b);
+  });
+  bar.append(seg);
+  v.append(bar);
+
+  // comparison chart card, when 2+ picked
+  if (st.cmp.length >= 2) {
+    const cc = el("div", "card");
+    const names = st.cmp.map((id, i) =>
+      `<span class="key"><span class="swatch" style="background:var(--s${(i % 4) + 1})"></span>${esc(S.values[id]?.name || pinfo(id).n)}</span>`);
+    cc.append(el("h2", null, "Price paths, compared"),
+      el("div", "legend", names.join("")));
+    const chart = histChart(st.cmp, 680, 150);
+    cc.append(el("div", null, chart || '<div class="empty">Not enough history for these players.</div>'));
+    const clr = el("button", "btn ghost", "Clear comparison");
+    clr.addEventListener("click", () => { st.cmp = []; render(); });
+    cc.append(clr);
+    v.append(cc);
+  }
+
+  const q = st.q.trim().toLowerCase();
+  let rows = Object.entries(S.values)
+    .filter(([id, e]) => GROUPS.includes(e.pos || pinfo(id).p) && e.v > 0)
+    .map(([id, e]) => ({ id, e, name: e.name || pinfo(id).n, age: pinfo(id).a,
+      proj: S.sig?.[id]?.proj ?? null }));
+  if (st.pos !== "ALL") rows = rows.filter(r => (r.e.pos || pinfo(r.id).p) === st.pos);
+  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  const sorters = {
+    value: (a,b) => b.e.v - a.e.v,
+    trend: (a,b) => (b.e.tr || 0) - (a.e.tr || 0),
+    proj:  (a,b) => (b.proj ?? -1) - (a.proj ?? -1),
+    age:   (a,b) => (a.age ?? 99) - (b.age ?? 99),
+  };
+  rows.sort(sorters[st.sort] || sorters.value);
+  const shown = rows.slice(0, 80);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, `Players (${fmt(rows.length)})`),
+    el("div", "sub", "Click a row for the full read and price chart. Tick two or three to compare their paths."));
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th></th><th>Player</th><th class="num">Age</th>
+    <th class="num">Value</th><th class="num">30d</th><th class="num">Proj</th>
+    <th class="num">Edge</th><th>Read</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const r of shown) {
+    const tag = edgeTag(r.id);
+    const tr30 = r.e.tr || 0;
+    const row = el("tr", null,
+      `<td class="cmp-cell"></td>
+       <td>${esc(r.name)} <span class="posbadge">${esc(r.e.pos || pinfo(r.id).p)}</span></td>
+       <td class="num">${r.age ?? "—"}</td>
+       <td class="num">${fmt(r.e.v)}</td>
+       <td class="num">${!tr30 ? "·" : `<span class="${tr30 > 0 ? "delta-up" : "delta-down"}">${tr30 > 0 ? "▲" : "▼"} ${fmt(Math.abs(tr30))}</span>`}</td>
+       <td class="num">${r.proj != null ? r.proj.toFixed(1) : "—"}</td>
+       <td class="num">${edgeCell(r.id)}</td>
+       <td>${!["hold","nosample"].includes(tag.cls) ? `<span class="tag ${tag.cls}">${esc(tag.txt)}</span>` : ""}</td>`);
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = st.cmp.includes(r.id);
+    cb.addEventListener("click", ev => {
+      ev.stopPropagation();
+      if (cb.checked) { st.cmp.push(r.id); if (st.cmp.length > 4) st.cmp.shift(); }
+      else st.cmp = st.cmp.filter(x => x !== r.id);
+      render();
+    });
+    row.querySelector(".cmp-cell").append(cb);
+    row.addEventListener("click", ev => { showTT(fullRead(r.id), ev); ev.stopPropagation(); });
+    tb.append(row);
+  }
+  tbl.append(tb); card.append(tbl);
+  if (rows.length > shown.length)
+    card.append(el("div", "sub", `Showing ${shown.length} of ${fmt(rows.length)} — search to narrow.`));
+  v.append(card);
+}
+
+/* ---------- manager profiles ---------- */
+/* Who actually picks up the phone. Sleeper exposes every transaction; a
+   manager's history says whether an offer to them is a conversation or a
+   message into the void. Covers this league and, when the league renews, the
+   season before it — a brand-new league honestly has no history yet. */
+async function loadManagerProfiles() {
+  const prof = {};
+  for (const r of S.rosters) prof[r.roster_id] = { trades: 0, moves: 0, partners: {} };
+  const harvest = async (lid, ridMap) => {
+    const weeks = await Promise.all(Array.from({ length: 18 }, (_, i) =>
+      sleeper(`/league/${lid}/transactions/${i + 1}`).catch(() => [])));
+    for (const wk of weeks) for (const tx of (wk || [])) {
+      if (tx.status !== "complete") continue;
+      const rids = (tx.roster_ids || []).map(rid => ridMap ? ridMap[rid] : rid).filter(rid => prof[rid]);
+      if (tx.type === "trade" && rids.length >= 2) {
+        for (const rid of rids) {
+          prof[rid].trades++;
+          for (const other of rids) if (other !== rid)
+            prof[rid].partners[other] = (prof[rid].partners[other] || 0) + 1;
+        }
+      } else if (rids.length) {
+        for (const rid of rids) prof[rid].moves++;
+      }
+    }
+  };
+  try {
+    await harvest(S.league.league_id, null);
+    if (S.league.previous_league_id) {
+      // Map last season's roster ids to this season's via the owning user.
+      const prevRosters = await sleeper(`/league/${S.league.previous_league_id}/rosters`) || [];
+      const ownerToCur = {};
+      for (const r of S.rosters) ownerToCur[r.owner_id] = r.roster_id;
+      const ridMap = {};
+      for (const r of prevRosters) if (ownerToCur[r.owner_id] != null)
+        ridMap[r.roster_id] = ownerToCur[r.owner_id];
+      await harvest(S.league.previous_league_id, ridMap);
+    }
+  } catch {}
+  S.mgr = prof;
+  S.mgrLoaded = S.league?.league_id;
+}
+function mgrRead(rid) {
+  const m = S.mgr?.[rid];
+  if (!m) return null;
+  if (!m.trades && !m.moves) return { cls: "nosample", txt: "NO HISTORY",
+    why: "No completed transactions on record — either a brand-new league or a manager who never touches the roster." };
+  if (m.trades >= 3) return { cls: "buy", txt: `TRADES (${m.trades})`,
+    why: `${m.trades} completed trades on record — this manager actually deals. Worth the call.` };
+  if (m.trades >= 1) return { cls: "hold", txt: `${m.trades} TRADE${m.trades > 1 ? "S" : ""}`,
+    why: `${m.trades} completed trade${m.trades > 1 ? "s" : ""} on record.` };
+  return { cls: "sell", txt: "NEVER TRADES",
+    why: `${m.moves} roster moves but zero trades on record — expect silence, lead with your simplest offer.` };
+}
+
+/* ---------- trade finder ---------- */
+function pkgLine(ids) { return ids.map(x => x.kind === "pick" ? x.name : `${x.pos} ${S.values[x.id]?.name || pinfo(x.id).n}`).join(" + "); }
+function renderTradeFinder(v) {
+  if (!S.myRosterId) {
+    v.append(el("div", "card"), el("div", "empty", "Couldn't find your roster in this league."));
+    return;
+  }
+  const anyRostered = S.rosters.some(r => (r.players || []).length > 0);
+  if (!anyRostered) {
+    const card = el("div", "card");
+    card.append(el("h2", null, "Trade Finder"),
+      el("div", "empty",
+        "Every roster in this league is empty — nobody has drafted yet. " +
+        "Trade Finder needs real rosters to compare needs against; it has nothing to work with until then. " +
+        "The engine itself is live and already checked every other team in this league — there's just nobody on them."));
+    v.append(card); return;
+  }
+  if (S.mgrLoaded !== S.league?.league_id) {
+    // Guarded start: never latch onto an empty roster list (an early render
+    // during boot would profile zero managers and cache it), and never fire
+    // twice for the same league while a load is already in flight.
+    if (S.rosters.length && S.mgrLoadingFor !== S.league?.league_id) {
+      S.mgrLoadingFor = S.league?.league_id;
+      loadManagerProfiles().then(() => { if (S.tab === "tradefinder") render(); });
+    }
+    v.append(el("div", "status", '<span class="spin"></span>Reading league history…'));
+    return;
+  }
+  const { ideas, myArch, teams } = generateTradeIdeas();
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Your team", myArch ? myArch.cls.toUpperCase() : "—", myArch?.why || ""),
+    statTile("Trade ideas found", fmt(ideas.length), `across ${teams.length - 1} other rosters`),
+    statTile("Best fit", ideas[0] ? (ideas[0].fair*100).toFixed(0)+"% value match" : "—",
+      ideas[0] ? `vs ${ideas[0].oppName}` : ""));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Trade Finder"),
+    el("div", "sub", "Checked every other roster in the league for a fit: value that clears within 28%, " +
+      "matched where possible to a hole on your roster and a hole on theirs. Ranked by fairness first — " +
+      "edge and need only break ties, because an unfair trade nobody accepts is not a trade."));
+  card.append(evidenceNote());
+  if (!ideas.length) {
+    card.append(el("div", "empty",
+      "No package cleared the fairness bar against any opponent right now. That will change as rosters fill in and prices move."));
+    v.append(card); return;
+  }
+  for (const idea of ideas.slice(0, 10)) {
+    const box = el("div", "trade-idea");
+    const hdr = el("div", "ti-hdr");
+    const mg = mgrRead(idea.oppRid);
+    hdr.append(el("span", "ti-vs", `vs ${esc(idea.oppName)}`),
+      idea.oppArch ? el("span", `tag ${idea.oppArch.cls === "contender" ? "buy" : idea.oppArch.cls === "rebuilder" ? "sell" : "hold"}`,
+        idea.oppArch.cls.toUpperCase()) : null,
+      mg ? el("span", `tag ${mg.cls}`, esc(mg.txt)) : null,
+      el("span", "ti-fair", `${(idea.fair*100).toFixed(0)}% value match`));
+    box.append(hdr);
+    const body = el("div", "ti-body");
+    body.append(
+      el("div", "ti-side", `<b>You send</b> ${esc(pkgLine(idea.give))} <span class="ti-val">${fmt(idea.gv)}</span>`),
+      el("div", "ti-arrow", "⇄"),
+      el("div", "ti-side", `<b>You get</b> ${esc(pkgLine(idea.get))} <span class="ti-val">${fmt(idea.tv)}</span>`));
+    box.append(body);
+    const why = el("div", "ti-why");
+    const winBits = [];
+    if (idea.needFit) winBits.push("fills a real hole on both sides, not just moving value around");
+    if (idea.edgeGain > 300) winBits.push(`you gain ${fmt(idea.edgeGain)} in Edge — the pieces coming back are underpriced for what they produce`);
+    else if (idea.edgeGain < -300) winBits.push(`costs you ${fmt(Math.abs(idea.edgeGain))} in Edge — you're paying a premium for fit, worth knowing`);
+    why.append(el("div", null, `<b>Why it's fair:</b> ${esc(winBits.length ? winBits.join("; ") : "value lines up closely on both sides")}.`));
+    if (idea.oppArch) why.append(el("div", null,
+      `<b>Why they might say yes:</b> ${esc(idea.oppName)} reads as a ${idea.oppArch.cls} (${idea.oppArch.why}) — ` +
+      `${idea.oppArch.cls === "contender" ? "win-now teams pay for immediate starters." :
+        idea.oppArch.cls === "rebuilder" ? "rebuilding teams want the pieces you're sending, not the ones you're asking for." :
+        "not clearly buying or selling, so fit matters more than saying no."}`));
+    box.append(why);
+    // The pitch, written for the OTHER manager: what they get and why it helps
+    // their build. Analysis that never becomes a sent message is a spreadsheet.
+    const offerBtn = el("button", "btn ghost ti-offer", "✉ Write the offer");
+    offerBtn.addEventListener("click", ev => {
+      ev.stopPropagation();
+      // Package assets carry ids, not names — resolve the same way pkgLine does.
+      const nameOf = x => x.kind === "pick" ? x.name : (S.values[x.id]?.name || pinfo(x.id).n);
+      const them = idea.give.map(nameOf).join(" + ");
+      const me = idea.get.map(nameOf).join(" + ");
+      const hooks = idea.give.filter(x => x.kind !== "pick").map(x => {
+        const e = S.edges[x.id], o = opportunity(x.id);
+        if (o && ["elite","strong"].includes(o.tier)) return `${nameOf(x)} ${o.why.split(",")[0]}`;
+        if (e?.prodRank) return `${nameOf(x)} finished ${e.pos}${e.prodRank} in adjusted production`;
+        return null;
+      }).filter(Boolean).slice(0, 2);
+      const arch = idea.oppArch?.cls;
+      const angle = arch === "contender"
+        ? "You're built to win now, and this adds to your starting lineup immediately."
+        : arch === "rebuilder"
+        ? "You're building for later, and this sends you the younger, longer pieces."
+        : "Value's close to dead even, so it comes down to fit — and this fits both of us.";
+      const pitch = `Hey — would you do ${them} for ${me}?\n\n` +
+        (hooks.length ? hooks.join(". ") + ". " : "") + angle +
+        `\n\nBy market values it's ${(idea.fair*100).toFixed(0)}% even` +
+        (idea.sweetened ? ` (threw in the ${idea.sweetened} to square it up)` : "") + `. Open to tweaks.`;
+      showTT(`<div class="tt-title">Offer for ${esc(idea.oppName)}</div>` +
+        `<div class="tt-row"><span style="white-space:pre-wrap">${esc(pitch)}</span></div>` +
+        `<button class="btn" id="copyOffer" style="margin-top:8px">Copy to clipboard</button>`, ev);
+      document.getElementById("copyOffer")?.addEventListener("click", () => {
+        navigator.clipboard?.writeText(pitch).then(() => {
+          document.getElementById("copyOffer").textContent = "Copied ✓";
+        });
+      });
+    });
+    box.append(offerBtn);
+    const html = idea.get.concat(idea.give).filter(x => x.kind !== "pick").map(x => fullRead(x.id)).join("<hr style='border-color:var(--grid);margin:8px 0'>");
+    box.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    card.append(box);
+  }
+  card.append(el("div", "sub", "Tap a card for the full reasoning on every player in the deal."));
+  v.append(card);
+}
+
+/* ---------- development candidates ---------- */
+/* The one board that needs no fantasy roster at all — it reads NFL depth
+   charts, not fantasy ones, so it works before either league has drafted a
+   single pick. That's deliberate: this is the signal available right now. */
+function renderDevBoard(v, owner) {
+  const rows = [];
+  for (const id of Object.keys(S.sig || {})) {
+    if (S.boardPos !== "ALL" && S.sig[id].pos !== S.boardPos) continue;
+    const sc = successionRead(id);
+    if (!sc) continue;
+    rows.push({ id, sc, own: owner.get(id), name: S.values[id]?.name || pinfo(id).n });
+  }
+  // Youngest-behind-oldest first — the widest gap is the clearest bet.
+  rows.sort((a,b) => (b.sc.incAge - b.sc.myAge) - (a.sc.incAge - a.sc.myAge));
+
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Development candidates", fmt(rows.length), "young, behind a fading starter, still cheap"),
+    statTile("Depth charts as of", S.sigMeta?.built ? esc(S.sigMeta.built) : "—", "ESPN via nflverse, refreshed ~daily"),
+    statTile("Needs a fantasy roster?", "No", "this reads NFL depth charts, not your league"));
+  v.append(stats);
+
+  // This week's depth movement, freshest first. Not filtered to succession
+  // candidates: an incumbent FALLING is exactly what clears a path.
+  const movers = Object.keys(S.sig || {})
+    .map(id => ({ id, dd: depthDelta(id) }))
+    .filter(x => x.dd && (S.boardPos === "ALL" || S.sig[x.id].pos === S.boardPos))
+    .sort((a,b) => (b.dd.big ? 1 : 0) - (a.dd.big ? 1 : 0));
+  if (movers.length) {
+    const mc = el("div", "card");
+    mc.append(el("h2", null, "This week's path changes"),
+      el("div", "sub", "Depth-chart moves in the last ~7 days — the market usually takes days to reprice these."));
+    const wrap = el("div", "sig-chips");
+    for (const m of movers.slice(0, 20)) {
+      const chip = el("button", `tag ${m.dd.cls}`,
+        `${esc(S.values[m.id]?.name || pinfo(m.id).n)} ${esc(m.dd.txt)}`);
+      chip.addEventListener("click", ev => { showTT(fullRead(m.id), ev); ev.stopPropagation(); });
+      wrap.append(chip);
+    }
+    mc.append(wrap);
+    v.append(mc);
+  }
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Development candidates"),
+    el("div", "sub", "Dynasty value is partly a bet on a role a player doesn't have yet. These are young " +
+      "players stuck behind a starter on the back half of his own age curve — the market can't price a role " +
+      "change that hasn't happened, so it's priced like it never will."));
+  if (!rows.length) { card.append(el("div", "empty", "No development candidates clear the bar with this filter.")); v.append(card); return; }
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Held by</th><th class="num">Age</th>
+    <th>Behind</th><th class="num">Incumbent age</th><th class="num">Value</th>
+    <th class="num">Draft capital</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const r of rows.slice(0, 30)) {
+    const d = draftRead(r.id);
+    const row = el("tr", r.own?.mine ? "me" : null,
+      `<td>${esc(r.name)} <span class="posbadge">${esc(S.sig[r.id].pos)}</span></td>
+       <td>${r.own ? esc(r.own.name) + (r.own.mine ? " (you)" : "") : '<span style="color:var(--ink-muted)">free agent</span>'}</td>
+       <td class="num">${r.sc.myAge}</td>
+       <td>${esc(r.sc.incName)}</td>
+       <td class="num">${r.sc.incAge}</td>
+       <td class="num">${fmt(val(r.id))}</td>
+       <td class="num">${d ? esc(d.txt) : '<span style="color:var(--ink-muted)">—</span>'}</td>`);
+    const html = fullRead(r.id);
+    row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(row);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub", `Showing ${Math.min(30, rows.length)} of ${rows.length} · tap a row for the full reasoning.`));
+  v.append(card);
+}
+
+/* ---------- buy-low / sell-high board ---------- */
+function renderBoard(v) {
+  const owner = new Map();
+  for (const r of S.rosters) for (const id of (r.players || []))
+    if (id && id !== "0") owner.set(id, { name: teamName(r.roster_id), mine: r.roster_id === S.myRosterId });
+
+  const bar = el("div", "controls");
+  const seg = el("span", "seg");
+  [["buy","Buy low"], ["sell","Sell high"], ["dev","Development"]].forEach(([k, lab]) => {
+    const b = el("button", S.boardSide === k ? "on" : null, lab);
+    b.addEventListener("click", () => { S.boardSide = k; render(); });
+    seg.append(b);
+  });
+  bar.append(seg, el("span", "head-spacer"));
+  ["ALL", ...GROUPS].forEach(g => {
+    const c = el("button", "chip" + (S.boardPos === g ? " on" : ""), g);
+    c.addEventListener("click", () => { S.boardPos = g; render(); });
+    bar.append(c);
+  });
+  v.append(bar);
+
+  if (S.boardSide === "dev") { renderDevBoard(v, owner); return; }
+
+  const buying = S.boardSide === "buy";
+  const rows = [];
+  for (const id of Object.keys(S.edges)) {
+    const e = S.edges[id];
+    if (S.boardPos !== "ALL" && e.pos !== S.boardPos) continue;
+    const sc = boardScore(id);
+    if (sc == null) continue;
+    const o = opportunity(id), l = luckRead(id), own = owner.get(id);
+    if (buying) {
+      // Worth chasing only if the usage is real and the price has not caught up.
+      if (!["elite","strong"].includes(o.tier)) continue;
+      if (e.tdLuck >= 2) continue;                   // his scoring is inflated too
+      if (e.tdLuck > -0.5 && e.edge < 500) continue;
+      if (own?.mine) continue;                       // already yours
+    } else {
+      // Selling high needs an actual high. A player who was touchdown-UNLUCKY has
+      // no inflated price to cash in — listing him here is advice to sell a trough.
+      if (e.tdLuck < 1) continue;
+      if (e.edge > -500 && e.tdLuck < 4) continue;   // priced fairly and only mildly lucky
+      if (val(id) < 1000) continue;                  // not worth marketing
+    }
+    rows.push({ id, e, o, l, own, sc, name: S.values[id]?.name || pinfo(id).n });
+  }
+  rows.sort((a,b) => buying ? b.sc - a.sc : a.sc - b.sc);
+  const top = rows.slice(0, 24);
+
+  const meta = S.sigMeta;
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile(buying ? "Buy-low candidates" : "Sell-high candidates", fmt(rows.length),
+      buying ? "real usage, unlucky, underpriced" : "luck-inflated or overpriced"),
+    statTile("On other rosters", fmt(top.filter(r => r.own && !r.own.mine).length),
+      "trade targets, not waiver adds"),
+    statTile("Usage data", meta ? esc(meta.latest) + " season" : "unavailable",
+      meta ? "nflverse snapshot · " + esc(meta.built) : "baked file not found"));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, buying ? "Buy low" : "Sell high"),
+    el("div", "sub", buying
+      ? "Players whose usage says they are good, whose touchdown luck says last season lied, and whose price has not caught up."
+      : "Players whose scoring outran their usage. Those touchdowns are the least likely part of last season to repeat."));
+  card.append(evidenceNote());
+  if (!top.length) { card.append(el("div", "empty", "Nothing clears the bar with this filter.")); v.append(card); return; }
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Held by</th><th class="num">Age</th>
+    <th class="num">Usage</th><th>Tier</th><th class="num">Trend</th><th class="num">Pts/gm</th>
+    <th class="num">Adj</th><th class="num">Proj</th><th class="num">Luck</th>
+    <th class="num">Value</th><th class="num">Mkt gap</th><th class="num">Edge</th>
+    <th>Age curve</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const r of top) {
+    const p = pinfo(r.id);
+    const tierCls = { elite:"diamond", strong:"buy", rotational:"hold", thin:"nosample" }[r.o.tier];
+    const row = el("tr", r.own?.mine ? "me" : null,
+      `<td>${esc(r.name)} <span class="posbadge">${esc(r.e.pos)}</span></td>
+       <td>${r.own ? esc(r.own.name) + (r.own.mine ? " (you)" : "") : '<span style="color:var(--ink-muted)">free agent</span>'}</td>
+       <td class="num">${p.a ?? "—"}</td>
+       <td class="num">${esc(r.o.txt)} <span style="color:var(--ink-muted);font-size:11px">${esc(r.o.lab)}</span></td>
+       <td><span class="tag ${tierCls}">${esc(r.o.tier.toUpperCase())}</span></td>
+       <td class="num">${(() => { const t = usageTrend(r.id); return t
+          ? `<span class="${t.dir === "up" ? "edge-pos" : t.dir === "down" ? "edge-neg" : ""}">${esc(t.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
+       <td class="num">${r.e.rawPpg ? r.e.rawPpg.toFixed(1) : "—"}</td>
+       <td class="num">${r.e.ppg ? r.e.ppg.toFixed(1) : "—"}</td>
+       <td class="num">${(() => { const pj = projection(r.id); return pj
+          ? `<b>${pj.ppg.toFixed(1)}</b>` : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
+       <td class="num"><span class="${r.l.cls === "buy" ? "edge-pos" : r.l.cls === "sell" ? "edge-neg" : ""}">${esc(r.l.txt)}</span></td>
+       <td class="num">${fmt(val(r.id))}</td>
+       <td class="num">${(() => { const ms = marketSplit(r.id); return ms && ms.dir !== "agree"
+          ? `<span class="${ms.gap > 0 ? "edge-pos" : "edge-neg"}">${esc(ms.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">·</span>'; })()}</td>
+       <td class="num">${edgeCell(r.id)}</td>
+       <td>${(() => { const a = ageRead(r.id); return a ? `<span class="tag ${a.cls}">${esc(a.txt)}</span>` : ""; })()}</td>`);
+    const html = fullRead(r.id, r.own && !r.own.mine
+      ? [`Held by ${r.own.name} — this is a trade, not a waiver add.`] : []);
+    row.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(row);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub",
+    `Pts/gm is what he scored; Adj is the same season with lucky and unlucky touchdowns taken back out. ` +
+    `Hover or tap any row for the full reasoning. Usage from ${meta ? esc(meta.latest) : "—"}; ` +
+    `this is a snapshot, not a live feed.`));
+  v.append(card);
+}
+
+/* ---------- free agents ---------- */
+function renderFreeAgents(v) {
+  const rostered = new Set();
+  for (const r of S.rosters) for (const id of (r.players || [])) if (id && id !== "0") rostered.add(id);
+
+  const pool = [];
+  for (const [id, e] of Object.entries(S.values)) {
+    if (rostered.has(id)) continue;
+    const p = pinfo(id), pos = e.pos || p.p;
+    if (!GROUPS.includes(pos)) continue;
+    pool.push({ id, name: e.name || p.n, pos, team: p.t, age: p.a,
+      v: e.v, tr: e.tr || 0, ed: S.edges[id] || null });
+  }
+
+  const bar = el("div", "controls");
+  ["ALL", ...GROUPS].forEach(g => {
+    const c = el("button", "chip" + (S.faPos === g ? " on" : ""), g);
+    c.addEventListener("click", () => { S.faPos = g; render(); });
+    bar.append(c);
+  });
+  bar.append(el("span", "head-spacer"));
+  const seg = el("span", "seg");
+  [["edge","Best edge"], ["value","Value"], ["ppg","Points/gm"], ["trend","Trending"]].forEach(([k, lab]) => {
+    const b = el("button", S.faSort === k ? "on" : null, lab);
+    b.addEventListener("click", () => { S.faSort = k; render(); });
+    seg.append(b);
+  });
+  bar.append(seg);
+  v.append(bar);
+
+  const shown = pool.filter(p => S.faPos === "ALL" || p.pos === S.faPos);
+  const sorters = {
+    edge:  (a,b) => (b.ed?.edge ?? -1e9) - (a.ed?.edge ?? -1e9),
+    value: (a,b) => b.v - a.v,
+    ppg:   (a,b) => (b.ed?.ppg || 0) - (a.ed?.ppg || 0),
+    trend: (a,b) => b.tr - a.tr,
+  };
+  shown.sort(sorters[S.faSort] || sorters.edge);
+  const rows = shown.slice(0, 60);
+
+  const gems = shown.filter(p => ["diamond","buy"].includes(edgeTag(p.id).cls)).length;
+  const stats = el("div", "statrow");
+  stats.append(
+    statTile("Free agents graded", fmt(shown.filter(p => p.ed?.edge != null).length),
+      `${fmt(shown.length)} total available`),
+    statTile("Underpriced on the wire", fmt(gems), "produce above their market price"),
+    statTile("Production baseline", esc(S.prodSeason || "—"),
+      `${MIN_GP}+ games to be ranked`));
+  v.append(stats);
+
+  const card = el("div", "card");
+  card.append(el("h2", null, "Free agents by edge"),
+    el("div", "sub", "Edge compares a player only against others at his position " +
+      (S.mode === "dynasty" ? "and in his age group" : "") +
+      ": what the market charges for his level of production, minus what it charges for him. " +
+      "Positive means he outscores his price. Thin samples are damped toward zero."));
+  if (!rows.length) { card.append(el("div", "empty", "No free agents match that filter.")); v.append(card); return; }
+
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th>Team</th><th class="num">Age</th>
+    <th class="num">Pts/gm</th><th class="num">Gm</th><th class="num">Produces</th>
+    <th class="num">Priced</th><th class="num">Trend</th><th class="num">Proj</th>
+    <th class="num">Value</th><th class="num">Mkt gap</th><th class="num">Edge</th>
+    <th class="num">30d</th><th>Read</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const p of rows) {
+    const e = p.ed, tag = edgeTag(p.id);
+    const trTxt = !p.tr ? '<span style="color:var(--ink-muted)">·</span>'
+      : `<span class="${p.tr > 0 ? "delta-up" : "delta-down"}">${p.tr > 0 ? "▲" : "▼"} ${fmt(Math.abs(p.tr))}</span>`;
+    const tr = el("tr", null,
+      `<td>${esc(p.name)} <span class="posbadge">${esc(p.pos)}</span></td>
+       <td>${esc(p.team || "FA")}</td>
+       <td class="num">${p.age ?? "—"}</td>
+       <td class="num">${e?.ppg ? e.ppg.toFixed(1) : "—"}</td>
+       <td class="num">${e?.gp || "—"}</td>
+       <td class="num">${e?.prodRank ? esc(p.pos + e.prodRank) : "—"}</td>
+       <td class="num">${e?.priceRank ? esc(p.pos + e.priceRank) : "—"}</td>
+       <td class="num">${(() => { const t = usageTrend(p.id); return t
+          ? `<span class="${t.dir === "up" ? "edge-pos" : t.dir === "down" ? "edge-neg" : ""}">${esc(t.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
+       <td class="num">${(() => { const pj = projection(p.id); return pj
+          ? `<b>${pj.ppg.toFixed(1)}</b>` : '<span style="color:var(--ink-muted)">—</span>'; })()}</td>
+       <td class="num">${fmt(p.v)}</td>
+       <td class="num">${(() => { const ms = marketSplit(p.id); return ms && ms.dir !== "agree"
+          ? `<span class="${ms.gap < 0 ? "edge-pos" : "edge-neg"}">${esc(ms.txt)}</span>`
+          : '<span style="color:var(--ink-muted)">·</span>'; })()}</td>
+       <td class="num">${edgeCell(p.id)}</td>
+       <td class="num">${trTxt}</td>
+       <td><span class="tag ${tag.cls}">${esc(tag.txt)}</span>${postHype(p.id) ? ' <span class="tag diamond">POST-HYPE</span>' : ""}</td>`);
+    const html = fullRead(p.id);
+    tr.addEventListener("click", ev => { showTT(html, ev); ev.stopPropagation(); });
+    tb.append(tr);
+  }
+  tbl.append(tb); card.append(tbl);
+  card.append(el("div", "sub", `Showing ${rows.length} of ${fmt(shown.length)} · ` +
+    `production from the ${esc(S.prodSeason || "—")} season · tap a row for the reasoning`));
+  v.append(card);
+}
+
+/* ---------- standings ---------- */
+function renderStandings(v) {
+  const card = el("div", "card");
+  card.append(el("h2", null, "Standings"),
+    el("div", "sub", `${esc(S.league.name)} · ${esc(S.season)} season`));
+  const pts = (s, pre) => (s?.[pre] || 0) + (s?.[pre + "_decimal"] || 0) / 100;
+  const rows = [...S.rosters].sort((x,y) =>
+    (y.settings?.wins||0) - (x.settings?.wins||0) || pts(y.settings,"fpts") - pts(x.settings,"fpts"));
+  const anyGames = rows.some(r => (r.settings?.wins||0) + (r.settings?.losses||0) > 0);
+  if (!anyGames) { card.append(el("div", "empty",
+    "No games played yet this season — standings appear after week 1.")); v.append(card); return; }
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>#</th><th>Team</th><th class="num">W</th>
+    <th class="num">L</th><th class="num">PF</th><th class="num">PA</th></tr></thead>`;
+  const tb = el("tbody");
+  rows.forEach((r, i) => {
+    const s = r.settings || {};
+    tb.append(el("tr", r.roster_id === S.myRosterId ? "me" : null,
+      `<td>${i+1}</td><td>${esc(teamName(r.roster_id))}${r.roster_id === S.myRosterId ? ' <span class="you posbadge">YOU</span>' : ""}</td>
+       <td class="num">${s.wins||0}</td><td class="num">${s.losses||0}</td>
+       <td class="num">${pts(s,"fpts").toFixed(1)}</td><td class="num">${pts(s,"fpts_against").toFixed(1)}</td>`));
+  });
+  tbl.append(tb); card.append(tbl); v.append(card);
+}
+
+/* ---------- market ---------- */
+async function renderMarket(v) {
+  v.append(el("div", "status", '<span class="spin"></span>Loading market movers…'));
+  let adds = [], drops = [];
+  try { [adds, drops] = await Promise.all([
+    sleeper("/players/nfl/trending/add?lookback_hours=24&limit=12"),
+    sleeper("/players/nfl/trending/drop?lookback_hours=24&limit=12")]); } catch {}
+  if (S.tab !== "market") return;
+  v.innerHTML = "";
+  const wrap = el("div", "grid2");
+  wrap.append(marketCard("Hottest adds (24h)", adds || [], "add"),
+              marketCard("Most dropped (24h)", drops || [], "drop"));
+  v.append(wrap);
+}
+function marketCard(title, rows, kind) {
+  const card = el("div", "card");
+  card.append(el("h2", null, esc(title)),
+    el("div", "sub", "Sleeper waiver activity across all leagues · value = trade value"));
+  if (!rows.length) { card.append(el("div", "empty", "Market data unavailable right now.")); return card; }
+  const max = Math.max(...rows.map(r => r.count || 0), 1);
+  const tbl = el("table");
+  tbl.innerHTML = `<thead><tr><th>Player</th><th style="width:40%">${kind === "add" ? "Adds" : "Drops"}</th>
+    <th class="num">Count</th><th class="num">Value</th></tr></thead>`;
+  const tb = el("tbody");
+  for (const r of rows) {
+    const p = pinfo(String(r.player_id));
+    tb.append(el("tr", null,
+      `<td>${esc(p.n)} <span class="posbadge">${esc(p.p)}</span></td>
+       <td><span class="meter"><span class="track"><span class="fill" style="width:${(r.count||0)/max*100}%"></span></span></span></td>
+       <td class="num">${fmt(r.count || 0)}</td>
+       <td class="num">${val(String(r.player_id)) ? fmt(val(String(r.player_id))) : "—"}</td>`));
+  }
+  tbl.append(tb); card.append(tbl);
+  return card;
+}
+
+/* =============================== boot / flows =============================== */
+async function loadEverything(username) {
+  banner("");
+  $("#tabs").classList.add("hidden"); $("#controls").classList.add("hidden");
+  $("#view").innerHTML = "";
+  try {
+    setStatus(`Looking up ${username}…`);
+    const user = await sleeper(`/user/${encodeURIComponent(username)}`);
+    if (!user) { setStatus(null);
+      banner(`Sleeper user <b>${esc(username)}</b> not found — check the spelling.`, true); return; }
+    S.user = user; S.username = user.username || username;
+    const av = $("#uavatar");
+    if (user.avatar && !DEMO) { av.src = `${CDN}/avatars/thumbs/${user.avatar}`; av.classList.remove("hidden"); }
+    else av.classList.add("hidden");
+
+    setStatus("Finding your leagues…");
+    const state = await sleeper("/state/nfl") || {};
+    S.seasonType = state.season_type || null;
+    let season = String(state.league_season || state.season || new Date().getFullYear());
+    let leagues = await sleeper(`/user/${user.user_id}/leagues/nfl/${season}`) || [];
+    if (!leagues.length) {
+      const prev = String(Number(season) - 1);
+      leagues = await sleeper(`/user/${user.user_id}/leagues/nfl/${prev}`) || [];
+      if (leagues.length) { season = prev;
+        banner(`No ${esc(String(Number(prev)+1))} leagues yet — showing your <b>${esc(prev)}</b> leagues.`); }
+    }
+    S.season = season; S.leagues = leagues;
+    if (!leagues.length) { setStatus(null);
+      banner(`<b>${esc(S.username)}</b> has no NFL leagues in ${esc(season)}.`, true); return; }
+
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get("league");
+    await pickLeague(leagues.find(l => l.league_id === wanted) || leagues[0]);
+  } catch (e) {
+    setStatus(null);
+    banner(`Couldn't reach the Sleeper API (${esc(e.message || e)}). ` +
+      `If you opened this file directly, try serving it: <code>python3 -m http.server</code>`, true);
+  }
+}
+async function pickLeague(league) {
+  S.league = league; S.trade = { a:[], b:[] }; S.rosterView = null;
+  const chips = $("#leagueChips"); chips.innerHTML = "";
+  S.leagues.forEach(l => {
+    const c = el("button", "chip" + (l.league_id === league.league_id ? " on" : ""), esc(l.name));
+    c.addEventListener("click", () => pickLeague(l));
+    chips.append(c);
+  });
+  try {
+    setStatus(`Loading ${league.name}…`);
+    const [rosters, lusers, tpicks] = await Promise.all([
+      sleeper(`/league/${league.league_id}/rosters`),
+      sleeper(`/league/${league.league_id}/users`),
+      sleeper(`/league/${league.league_id}/traded_picks`).catch(() => [])]);
+    S.rosters = rosters || []; S.lusers = lusers || []; S.tradedPicks = tpicks || [];
+    S.rankCurve = null;
+    const mine = S.rosters.find(r =>
+      r.owner_id === S.user.user_id || (r.co_owners || []).includes(S.user.user_id));
+    S.myRosterId = mine ? mine.roster_id : null;
+
+    await loadPlayers();
+    setStatus("Loading trade values…");
+    await loadValues();
+    setStatus("Loading production and usage…");
+    await loadSignals();
+    await loadRisk();
+    calibrateMarkets();
+    try { await loadStats(); } catch { S.stats = {}; S.prodSeason = null; }
+    computeEdges();
+    computeDepthIndex();
+
+    const f = leagueFormat();
+    $("#fmtPill").textContent =
+      `${f.numQbs === 2 ? "Superflex" : "1QB"} · ${f.ppr === 1 ? "PPR" : f.ppr === 0.5 ? "Half PPR" : f.ppr + " PPR"}` +
+      (f.tep ? " · TEP" : "") + ` · ${f.teams} tm`;
+    // Shareable deep link. Sandboxed hosts can refuse replaceState — not fatal.
+    if (!DEMO) try {
+      const url = new URL(location); url.searchParams.set("user", S.username);
+      url.searchParams.set("league", league.league_id); history.replaceState(null, "", url);
+    } catch {}
+
+    setStatus(null);
+    $("#controls").classList.remove("hidden");
+    $("#tabs").classList.remove("hidden");
+    render();
+  } catch (e) {
+    setStatus(null);
+    banner(`Couldn't load that league (${esc(e.message || e)}).`, true);
+  }
+}
+
+/* ---------- wire up ---------- */
+document.addEventListener("click", hideTT);   // tap anywhere to dismiss a pinned tooltip
+document.querySelectorAll("nav.tabs button").forEach(b =>
+  b.addEventListener("click", () => { S.tab = b.dataset.tab; render(); }));
+$("#planSeg").querySelectorAll("button").forEach(b =>
+  b.addEventListener("click", () => {
+    S.plan = b.dataset.plan;
+    remember("wc_plan", S.plan);
+    $("#planSeg").querySelectorAll("button").forEach(x =>
+      x.classList.toggle("on", x === b));
+    render();
+  }));
+$("#modeSeg").querySelectorAll("button").forEach(b =>
+  b.addEventListener("click", async () => {
+    if (S.mode === b.dataset.mode) return;
+    S.mode = b.dataset.mode;
+    $("#modeSeg").querySelectorAll("button").forEach(x =>
+      x.classList.toggle("on", x === b));
+    setStatus("Reloading values…"); await loadValues();
+    computeEdges();   // the price ladder moved, so every edge moves with it
+    setStatus(null); render();
+  }));
+/* localStorage throws in some sandboxed embeddings — never let it break a click. */
+const remember = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const recall = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+$("#loadBtn").addEventListener("click", () => {
+  const u = $("#uname").value.trim(); if (u) { remember("wc_user", u); loadEverything(u); }
+});
+$("#uname").addEventListener("keydown", e => { if (e.key === "Enter") $("#loadBtn").click(); });
+$("#themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  remember("wc_theme", next);
+});
+
+(function boot() {
+  S.plan = recall("wc_plan") || "flexible";
+  document.querySelectorAll("#planSeg button").forEach(b =>
+    b.classList.toggle("on", b.dataset.plan === S.plan));
+  const savedTheme = recall("wc_theme");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  const qs = new URLSearchParams(location.search);
+  const u = DEMO ? DEMO.user.display_name
+    : (qs.get("user") || recall("wc_user") || "PaySuk34");
+  $("#uname").value = u;
+  if (DEMO) { $("#uname").disabled = true; $("#loadBtn").disabled = true;
+    $("#uname").title = "Fixed in the preview — the live site loads any username"; }
+  loadEverything(u);
+})();
+</script>
+</body>
+</html>

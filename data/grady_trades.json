@@ -1,0 +1,1797 @@
+{
+  "league_name": "girls r stupid",
+  "team_name": "GradyNBilo235",
+  "format": {
+    "numQbs": 1,
+    "ppr": 1.0,
+    "teams": 12
+  },
+  "seasons": [
+    "2023",
+    "2024",
+    "2025",
+    "2026"
+  ],
+  "summary": {
+    "trade_count": 46,
+    "value_received": 125446,
+    "value_given": 151012,
+    "net": -25566,
+    "wins": 20,
+    "losses": 25,
+    "pushes": 1
+  },
+  "trades": [
+    {
+      "season": "2023",
+      "week": 1,
+      "date": "2023-09-10 10:55",
+      "opponents": [
+        "mahomos"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Kadarius Toney",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Skyy Moore",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 0,
+      "value_given": 0,
+      "net": 0,
+      "grade": "-"
+    },
+    {
+      "season": "2023",
+      "week": 1,
+      "date": "2023-08-02 15:23",
+      "opponents": [
+        "who wants receivers"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "James Cook",
+          "value": 5386,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. The Ladd McCock's) -> Malik Washington",
+          "value": 1170,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. GradyNBilo235) -> Isaiah Davis",
+          "value": 498,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "JuJu Smith-Schuster",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 5386,
+      "value_given": 1668,
+      "net": 3718,
+      "grade": "A+"
+    },
+    {
+      "season": "2023",
+      "week": 1,
+      "date": "2023-07-12 17:01",
+      "opponents": [
+        "josh allen\u2019s nutsack"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. The Ladd McCock's) -> Malik Washington",
+          "value": 1170,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "Samaje Perine",
+          "value": 104,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Damien Harris",
+          "value": 0,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 1274,
+      "value_given": 0,
+      "net": 1274,
+      "grade": "A+"
+    },
+    {
+      "season": "2023",
+      "week": 1,
+      "date": "2023-05-08 17:53",
+      "opponents": [
+        "mahomos"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2023 rd3 pick (orig. mahomos) -> Will Levis",
+          "value": 68,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2023 rd4 pick (orig. GradyNBilo235) -> Parker Washington",
+          "value": 2518,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2023 rd3 pick (orig. GradyNBilo235) -> Evan Hull",
+          "value": 0,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 68,
+      "value_given": 2518,
+      "net": -2450,
+      "grade": "F"
+    },
+    {
+      "season": "2023",
+      "week": 1,
+      "date": "2023-03-26 20:56",
+      "opponents": [
+        "AlexCarusoNFL"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Damien Harris",
+          "value": 0,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2023 rd2 pick (orig. GradyNBilo235) -> Marvin Mims",
+          "value": 372,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 0,
+      "value_given": 372,
+      "net": -372,
+      "grade": "F"
+    },
+    {
+      "season": "2023",
+      "week": 1,
+      "date": "2023-04-06 09:03",
+      "opponents": [
+        "Bruce1113"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Brian Robinson",
+          "value": 1260,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Tyreek Hill",
+          "value": 806,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "New England Patriots",
+          "value": 0,
+          "pos": "DEF"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Travis Etienne",
+          "value": 2813,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Jerry Jeudy",
+          "value": 1147,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 2066,
+      "value_given": 3960,
+      "net": -1894,
+      "grade": "F"
+    },
+    {
+      "season": "2023",
+      "week": 2,
+      "date": "2023-09-18 22:15",
+      "opponents": [
+        "mahomos",
+        "Will you suck it"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Daniel Jones",
+          "value": 1283,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. GradyNBilo235) -> Emmett Johnson",
+          "value": 964,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Raheem Mostert",
+          "value": 0,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Clyde Edwards-Helaire",
+          "value": 0,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 1283,
+      "value_given": 964,
+      "net": 319,
+      "grade": "B"
+    },
+    {
+      "season": "2023",
+      "week": 4,
+      "date": "2023-10-02 21:43",
+      "opponents": [
+        "josh allen\u2019s nutsack"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Tyler Allgeier",
+          "value": 1424,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. GradyNBilo235) -> Drake Maye",
+          "value": 4572,
+          "pos": "QB"
+        },
+        {
+          "kind": "player",
+          "name": "Adam Thielen",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 1424,
+      "value_given": 4572,
+      "net": -3148,
+      "grade": "F"
+    },
+    {
+      "season": "2023",
+      "week": 6,
+      "date": "2023-10-11 12:28",
+      "opponents": [
+        "Bruce1113"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Cade Otton",
+          "value": 993,
+          "pos": "TE"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. Donny) -> Theo Johnson",
+          "value": 738,
+          "pos": "TE"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. Donny) -> Audric Estime",
+          "value": 0,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Hunter Henry",
+          "value": 1190,
+          "pos": "TE"
+        },
+        {
+          "kind": "player",
+          "name": "Diontae Johnson",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 1731,
+      "value_given": 1190,
+      "net": 541,
+      "grade": "A"
+    },
+    {
+      "season": "2023",
+      "week": 7,
+      "date": "2023-10-25 10:10",
+      "opponents": [
+        "Rydad11"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2025 rd4 pick (orig. Rydad11) -> Oronde Gadsden",
+          "value": 1567,
+          "pos": "TE"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd1 pick (orig. Rydad11) -> Keon Coleman",
+          "value": 1163,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. Rydad11) -> Michael Penix",
+          "value": 771,
+          "pos": "QB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. mahomos) -> Javon Baker",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Tyreek Hill",
+          "value": 806,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 3501,
+      "value_given": 806,
+      "net": 2695,
+      "grade": "A+"
+    },
+    {
+      "season": "2023",
+      "week": 8,
+      "date": "2023-10-28 20:16",
+      "opponents": [
+        "mahomos"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. The Ladd McCock's) -> Roman Wilson",
+          "value": 221,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. mahomos) -> Isaac Guerendo",
+          "value": 79,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. mahomos) -> Devontez Walker",
+          "value": 21,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "James Cook",
+          "value": 5386,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 321,
+      "value_given": 5386,
+      "net": -5065,
+      "grade": "F"
+    },
+    {
+      "season": "2023",
+      "week": 9,
+      "date": "2023-11-03 12:01",
+      "opponents": [
+        "Will you suck it"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Quentin Johnston",
+          "value": 2011,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. Stroud Boy$) -> Ben Sinnott",
+          "value": 165,
+          "pos": "TE"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Will Levis",
+          "value": 68,
+          "pos": "QB"
+        }
+      ],
+      "value_received": 2176,
+      "value_given": 68,
+      "net": 2108,
+      "grade": "A+"
+    },
+    {
+      "season": "2023",
+      "week": 10,
+      "date": "2023-11-08 21:30",
+      "opponents": [
+        "U wot m8"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Michael Wilson",
+          "value": 2104,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2025 rd3 pick (orig. U wot m8) -> Jalen Milroe",
+          "value": 361,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. GradyNBilo235) -> Kimani Vidal",
+          "value": 936,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Calvin Ridley",
+          "value": 577,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. Donny) -> Audric Estime",
+          "value": 0,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 2465,
+      "value_given": 1513,
+      "net": 952,
+      "grade": "A"
+    },
+    {
+      "season": "2023",
+      "week": 11,
+      "date": "2023-11-21 20:20",
+      "opponents": [
+        "who wants receivers",
+        "Kareem Pies"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Zach Charbonnet",
+          "value": 1820,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Brock Purdy",
+          "value": 2326,
+          "pos": "QB"
+        },
+        {
+          "kind": "pick",
+          "name": "2025 rd2 pick (orig. Kareem Pies) -> Jaydon Blue",
+          "value": 1168,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. Rydad11) -> Michael Penix",
+          "value": 771,
+          "pos": "QB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. Donny) -> Theo Johnson",
+          "value": 738,
+          "pos": "TE"
+        },
+        {
+          "kind": "player",
+          "name": "AJ Dillon",
+          "value": 34,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. Kareem Pies) -> Ja'Lynn Polk",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 1820,
+      "value_given": 5037,
+      "net": -3217,
+      "grade": "F"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-09-10 18:08",
+      "opponents": [
+        "Donny"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Baker Mayfield",
+          "value": 1811,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2025 rd2 pick (orig. broke back boswell\u2019s) -> Terrance Ferguson",
+          "value": 1412,
+          "pos": "TE"
+        }
+      ],
+      "value_received": 1811,
+      "value_given": 1412,
+      "net": 399,
+      "grade": "B"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-08-27 15:08",
+      "opponents": [
+        "AlexCarusoNFL"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Tank Dell",
+          "value": 1321,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "Jaylen Wright",
+          "value": 886,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2027 1st pick (orig. GradyNBilo235, undrafted)",
+          "value": 2713,
+          "pos": "PICK"
+        },
+        {
+          "kind": "pick",
+          "name": "2027 2nd pick (orig. GradyNBilo235, undrafted)",
+          "value": 1430,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 2207,
+      "value_given": 4143,
+      "net": -1936,
+      "grade": "F"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-08-16 13:43",
+      "opponents": [
+        "mahomos"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd4 pick (orig. mahomos) -> Cole Payton",
+          "value": 118,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2025 rd4 pick (orig. GradyNBilo235) -> Savion Williams",
+          "value": 232,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 118,
+      "value_given": 232,
+      "net": -114,
+      "grade": "F"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-05-03 14:39",
+      "opponents": [
+        "\u201cfrisky\u201d"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. The Ladd McCock's) -> Malik Washington",
+          "value": 1170,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2024 rd4 pick (orig. mahomos) -> Isaac Guerendo",
+          "value": 79,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 1170,
+      "value_given": 79,
+      "net": 1091,
+      "grade": "A+"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-04-30 11:00",
+      "opponents": [
+        "U wot m8"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "DeMario Douglas",
+          "value": 226,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2026 rd3 pick (orig. GradyNBilo235) -> Ja'Kobi Lane",
+          "value": 1488,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. mahomos) -> Devontez Walker",
+          "value": 21,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 226,
+      "value_given": 1509,
+      "net": -1283,
+      "grade": "F"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-04-29 20:40",
+      "opponents": [
+        "The Ladd McCock's"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Jonathan Taylor",
+          "value": 5699,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. GradyNBilo235) -> Drake Maye",
+          "value": 4572,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2024 rd1 pick (orig. \u201cfrisky\u201d) -> Ladd McConkey",
+          "value": 3819,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "Brian Robinson",
+          "value": 1260,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd1 pick (orig. Rydad11) -> Keon Coleman",
+          "value": 1163,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. mahomos) -> Javon Baker",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 10271,
+      "value_given": 6242,
+      "net": 4029,
+      "grade": "A"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-04-28 10:09",
+      "opponents": [
+        "AlexCarusoNFL"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2024 rd1 pick (orig. \u201cfrisky\u201d) -> Ladd McConkey",
+          "value": 3819,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2025 rd2 pick (orig. broke back boswell\u2019s) -> Terrance Ferguson",
+          "value": 1412,
+          "pos": "TE"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. mahomos) -> Javon Baker",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. GradyNBilo235) -> Jadarian Price",
+          "value": 3510,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 5231,
+      "value_given": 3510,
+      "net": 1721,
+      "grade": "A"
+    },
+    {
+      "season": "2024",
+      "week": 1,
+      "date": "2024-04-20 17:53",
+      "opponents": [
+        "AlexCarusoNFL"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2024 rd1 pick (orig. Stroud Boy$) -> Brian Thomas",
+          "value": 3028,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2025 rd1 pick (orig. GradyNBilo235) -> TreVeyon Henderson",
+          "value": 3792,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. The Ladd McCock's) -> Roman Wilson",
+          "value": 221,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd3 pick (orig. Stroud Boy$) -> Ben Sinnott",
+          "value": 165,
+          "pos": "TE"
+        },
+        {
+          "kind": "pick",
+          "name": "2024 rd2 pick (orig. mahomos) -> Javon Baker",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 3028,
+      "value_given": 4178,
+      "net": -1150,
+      "grade": "D-"
+    },
+    {
+      "season": "2024",
+      "week": 4,
+      "date": "2024-09-30 21:17",
+      "opponents": [
+        "AlexCarusoNFL"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Trey Sermon",
+          "value": 0,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2025 rd3 pick (orig. U wot m8) -> Jalen Milroe",
+          "value": 361,
+          "pos": "QB"
+        }
+      ],
+      "value_received": 0,
+      "value_given": 361,
+      "net": -361,
+      "grade": "F"
+    },
+    {
+      "season": "2024",
+      "week": 6,
+      "date": "2024-10-09 12:45",
+      "opponents": [
+        "Kareem Pies"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Braelon Allen",
+          "value": 1246,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2025 rd4 pick (orig. Kareem Pies) -> Tory Horton",
+          "value": 1106,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Khalil Shakir",
+          "value": 1460,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "Tyler Allgeier",
+          "value": 1424,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 2352,
+      "value_given": 2884,
+      "net": -532,
+      "grade": "D"
+    },
+    {
+      "season": "2024",
+      "week": 9,
+      "date": "2024-11-05 20:07",
+      "opponents": [
+        "U wot m8"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "J.K. Dobbins",
+          "value": 1750,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Tank Dell",
+          "value": 1321,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 1750,
+      "value_given": 1321,
+      "net": 429,
+      "grade": "B"
+    },
+    {
+      "season": "2024",
+      "week": 14,
+      "date": "2024-12-04 17:02",
+      "opponents": [
+        "Donny"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. Donny) -> Chris Bell",
+          "value": 1292,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2025 rd2 pick (orig. Donny) -> Devin Neal",
+          "value": 312,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2025 rd4 pick (orig. broke back boswell\u2019s) -> Xavier Restrepo",
+          "value": 0,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Jonathan Taylor",
+          "value": 5699,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 1604,
+      "value_given": 5699,
+      "net": -4095,
+      "grade": "F"
+    },
+    {
+      "season": "2025",
+      "week": 1,
+      "date": "2025-08-19 22:48",
+      "opponents": [
+        "lbreen27",
+        "AlexCarusoBets"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "TreVeyon Henderson",
+          "value": 3792,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Michael Pittman",
+          "value": 1786,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Omarion Hampton",
+          "value": 6357,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. Sam Presti) -> Jordyn Tyson",
+          "value": 3804,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. GradyNBilo235) -> Jadarian Price",
+          "value": 3510,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Bhayshul Tuten",
+          "value": 2682,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2028 1st pick (orig. GradyNBilo235, undrafted)",
+          "value": 1936,
+          "pos": "PICK"
+        },
+        {
+          "kind": "player",
+          "name": "Zach Charbonnet",
+          "value": 1820,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. Sam Presti) -> Antonio Williams",
+          "value": 1513,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2027 3rd pick (orig. GradyNBilo235, undrafted)",
+          "value": 990,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 5578,
+      "value_given": 22612,
+      "net": -17034,
+      "grade": "F"
+    },
+    {
+      "season": "2025",
+      "week": 1,
+      "date": "2025-07-28 20:23",
+      "opponents": [
+        "mahomos"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "James Cook",
+          "value": 5386,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. Donny) -> Chris Bell",
+          "value": 1292,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2028 2nd pick (orig. GradyNBilo235, undrafted)",
+          "value": 1217,
+          "pos": "PICK"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd3 pick (orig. thomasjkennedy) -> Oscar Delp",
+          "value": 583,
+          "pos": "TE"
+        }
+      ],
+      "value_received": 5386,
+      "value_given": 3092,
+      "net": 2294,
+      "grade": "A"
+    },
+    {
+      "season": "2025",
+      "week": 1,
+      "date": "2025-05-05 19:17",
+      "opponents": [
+        "Kareem Pies"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd3 pick (orig. thomasjkennedy) -> Oscar Delp",
+          "value": 583,
+          "pos": "TE"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2025 rd4 pick (orig. Kareem Pies) -> Tory Horton",
+          "value": 1106,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 583,
+      "value_given": 1106,
+      "net": -523,
+      "grade": "F"
+    },
+    {
+      "season": "2025",
+      "week": 10,
+      "date": "2025-11-07 01:00",
+      "opponents": [
+        "AlexCarusoBets"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Malik Nabers",
+          "value": 6409,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "James Cook",
+          "value": 5386,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Drake Maye",
+          "value": 4572,
+          "pos": "QB"
+        },
+        {
+          "kind": "player",
+          "name": "Chris Olave",
+          "value": 4109,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "Breece Hall",
+          "value": 4003,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Brian Thomas",
+          "value": 3028,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "J.K. Dobbins",
+          "value": 1750,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2026 rd4 pick (orig. mahomos) -> Cole Payton",
+          "value": 118,
+          "pos": "QB"
+        }
+      ],
+      "value_received": 29257,
+      "value_given": 118,
+      "net": 29139,
+      "grade": "A+"
+    },
+    {
+      "season": "2025",
+      "week": 10,
+      "date": "2025-11-07 00:48",
+      "opponents": [
+        "AlexCarusoBets"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd4 pick (orig. mahomos) -> Cole Payton",
+          "value": 118,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Malik Nabers",
+          "value": 6409,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "James Cook",
+          "value": 5386,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Drake Maye",
+          "value": 4572,
+          "pos": "QB"
+        },
+        {
+          "kind": "player",
+          "name": "Chris Olave",
+          "value": 4109,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "Breece Hall",
+          "value": 4003,
+          "pos": "RB"
+        },
+        {
+          "kind": "player",
+          "name": "Brian Thomas",
+          "value": 3028,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "J.K. Dobbins",
+          "value": 1750,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 118,
+      "value_given": 29257,
+      "net": -29139,
+      "grade": "F"
+    },
+    {
+      "season": "2025",
+      "week": 10,
+      "date": "2025-11-05 15:18",
+      "opponents": [
+        "AlexCarusoBets"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2027 2nd pick (orig. GradyNBilo235, undrafted)",
+          "value": 1430,
+          "pos": "PICK"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. Connor B\u2019s Venmo) -> Ty Simpson",
+          "value": 1129,
+          "pos": "QB"
+        },
+        {
+          "kind": "pick",
+          "name": "2028 4th pick (orig. Donny, undrafted)",
+          "value": 750,
+          "pos": "PICK"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Michael Pittman",
+          "value": 1786,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd4 pick (orig. GradyNBilo235) -> Bryce Lance",
+          "value": 403,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd4 pick (orig. mahomos) -> Cole Payton",
+          "value": 118,
+          "pos": "QB"
+        }
+      ],
+      "value_received": 3309,
+      "value_given": 2307,
+      "net": 1002,
+      "grade": "A"
+    },
+    {
+      "season": "2025",
+      "week": 14,
+      "date": "2025-12-04 23:11",
+      "opponents": [
+        "AlexCarusoBets"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Tyjae Spears",
+          "value": 1231,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2028 4th pick (orig. Donny, undrafted)",
+          "value": 750,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 1231,
+      "value_given": 750,
+      "net": 481,
+      "grade": "A"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-06-30 14:25",
+      "opponents": [
+        "Donny"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Travis Etienne",
+          "value": 2813,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2029 1st pick (orig. GradyNBilo235, undrafted)",
+          "value": 1756,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 2813,
+      "value_given": 1756,
+      "net": 1057,
+      "grade": "A"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-06-30 14:29",
+      "opponents": [
+        "\u201cfraud\u201d"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Chris Godwin",
+          "value": 1512,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2029 2nd pick (orig. GradyNBilo235, undrafted)",
+          "value": 1176,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 1512,
+      "value_given": 1176,
+      "net": 336,
+      "grade": "B"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-06-16 01:06",
+      "opponents": [
+        "Connor B\u2019s Venmo"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2027 1st pick (orig. GradyNBilo235, undrafted)",
+          "value": 2713,
+          "pos": "PICK"
+        },
+        {
+          "kind": "player",
+          "name": "Alvin Kamara",
+          "value": 1283,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2029 4th pick (orig. GradyNBilo235, undrafted)",
+          "value": 762,
+          "pos": "PICK"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Chris Olave",
+          "value": 4109,
+          "pos": "WR"
+        },
+        {
+          "kind": "player",
+          "name": "Pat Freiermuth",
+          "value": 813,
+          "pos": "TE"
+        }
+      ],
+      "value_received": 4758,
+      "value_given": 4922,
+      "net": -164,
+      "grade": "C"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-06-03 18:02",
+      "opponents": [
+        "Connor B\u2019s Venmo"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Kimani Vidal",
+          "value": 936,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2029 4th pick (orig. GradyNBilo235, undrafted)",
+          "value": 762,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 936,
+      "value_given": 762,
+      "net": 174,
+      "grade": "B"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-05-14 12:18",
+      "opponents": [
+        "U wot m8"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Jordan James",
+          "value": 689,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2029 3rd pick (orig. GradyNBilo235, undrafted)",
+          "value": 890,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 689,
+      "value_given": 890,
+      "net": -201,
+      "grade": "D"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-05-02 13:22",
+      "opponents": [
+        "thomasjkennedy"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. thomasjkennedy) -> Makai Lemon",
+          "value": 3092,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. GradyNBilo235) -> Jadarian Price",
+          "value": 3510,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2027 2nd pick (orig. GradyNBilo235, undrafted)",
+          "value": 1430,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 3092,
+      "value_given": 4940,
+      "net": -1848,
+      "grade": "D-"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-04-29 11:56",
+      "opponents": [
+        "Connor B\u2019s Venmo"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd1 pick (orig. GradyNBilo235) -> Jadarian Price",
+          "value": 3510,
+          "pos": "RB"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd4 pick (orig. mahomos) -> Cole Payton",
+          "value": 118,
+          "pos": "QB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. Connor B\u2019s Venmo) -> Ty Simpson",
+          "value": 1129,
+          "pos": "QB"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. thomasjkennedy) -> Germie Bernard",
+          "value": 1120,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. larry\u2019s plumbing) -> Elijah Sarratt",
+          "value": 937,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 3628,
+      "value_given": 3186,
+      "net": 442,
+      "grade": "B"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-03-16 19:37",
+      "opponents": [
+        "thomasjkennedy"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. thomasjkennedy) -> Germie Bernard",
+          "value": 1120,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Parker Washington",
+          "value": 2518,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 1120,
+      "value_given": 2518,
+      "net": -1398,
+      "grade": "F"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-03-10 12:43",
+      "opponents": [
+        "Connor B\u2019s Venmo"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd4 pick (orig. GradyNBilo235) -> Bryce Lance",
+          "value": 403,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Malik Willis",
+          "value": 1239,
+          "pos": "QB"
+        }
+      ],
+      "value_received": 403,
+      "value_given": 1239,
+      "net": -836,
+      "grade": "F"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-03-04 13:45",
+      "opponents": [
+        "mahomos"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Isaiah Likely",
+          "value": 1935,
+          "pos": "TE"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "Dontayvion Wicks",
+          "value": 1147,
+          "pos": "WR"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. GradyNBilo235) -> Emmett Johnson",
+          "value": 964,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 1935,
+      "value_given": 2111,
+      "net": -176,
+      "grade": "C"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-02-27 11:58",
+      "opponents": [
+        "thomasjkennedy"
+      ],
+      "received": [
+        {
+          "kind": "player",
+          "name": "Jalen Nailor",
+          "value": 1201,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2027 4th pick (orig. GradyNBilo235, undrafted)",
+          "value": 783,
+          "pos": "PICK"
+        },
+        {
+          "kind": "pick",
+          "name": "2028 4th pick (orig. GradyNBilo235, undrafted)",
+          "value": 750,
+          "pos": "PICK"
+        }
+      ],
+      "value_received": 1201,
+      "value_given": 1533,
+      "net": -332,
+      "grade": "D"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-01-07 10:05",
+      "opponents": [
+        "larry\u2019s plumbing"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. larry\u2019s plumbing) -> Elijah Sarratt",
+          "value": 937,
+          "pos": "WR"
+        }
+      ],
+      "given": [
+        {
+          "kind": "pick",
+          "name": "2028 3rd pick (orig. GradyNBilo235, undrafted)",
+          "value": 909,
+          "pos": "PICK"
+        },
+        {
+          "kind": "player",
+          "name": "Elic Ayomanor",
+          "value": 818,
+          "pos": "WR"
+        }
+      ],
+      "value_received": 937,
+      "value_given": 1727,
+      "net": -790,
+      "grade": "D-"
+    },
+    {
+      "season": "2026",
+      "week": 1,
+      "date": "2026-01-05 20:50",
+      "opponents": [
+        "Connor B\u2019s Venmo"
+      ],
+      "received": [
+        {
+          "kind": "pick",
+          "name": "2027 1st pick (orig. Donny, undrafted)",
+          "value": 2713,
+          "pos": "PICK"
+        },
+        {
+          "kind": "pick",
+          "name": "2026 rd2 pick (orig. GradyNBilo235) -> Emmett Johnson",
+          "value": 964,
+          "pos": "RB"
+        }
+      ],
+      "given": [
+        {
+          "kind": "player",
+          "name": "James Cook",
+          "value": 5386,
+          "pos": "RB"
+        }
+      ],
+      "value_received": 3677,
+      "value_given": 5386,
+      "net": -1709,
+      "grade": "D-"
+    }
+  ]
+}
